@@ -10,9 +10,6 @@ npm install
 
 Copy `.env.example` to `.env` if needed (defaults to the local API):
 
-```
-VITE_API_URL=http://localhost:3001
-```
 
 ## Run
 
