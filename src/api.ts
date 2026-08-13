@@ -6,8 +6,8 @@ import type {
   StreamStatusEvent,
 } from './types'
 
-/** Empty in production → same-origin `/api/...` (Netlify proxies to GKE). */
-const API_URL = String(import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
+/** Same-origin `/api/...` — Netlify proxies to GKE; Vite proxies locally. */
+const API_URL = ''
 
 export function getManualPdfUrl(pageNumber?: number): string {
   const base = `${API_URL}/api/manual`

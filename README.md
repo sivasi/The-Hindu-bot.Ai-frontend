@@ -8,9 +8,6 @@ Standalone Vite + React + Tailwind UI for the newspaper RAG Q&A API.
 npm install
 ```
 
-Copy `.env.example` to `.env` if needed (defaults to the local API):
-
-
 ## Run
 
 Start the backend on port 3001, then:
@@ -18,6 +15,8 @@ Start the backend on port 3001, then:
 ```bash
 npm run dev
 ```
+
+The Vite dev server proxies `/api` to `http://localhost:3001`. On Netlify, `netlify.toml` proxies `/api` to GKE.
 
 ## Scope
 
