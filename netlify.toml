@@ -1,0 +1,14 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# Same-origin /api → GKE NodePort (avoids HTTPS→HTTP mixed content)
+[[redirects]]
+  from = "/api/*"
+  to = "http://34.93.159.106:30001/api/:splat"
+  status = 200
+  force = true
+
+[build.environment]
+  # Empty = relative /api/... on the Netlify origin
+  VITE_API_URL = ""

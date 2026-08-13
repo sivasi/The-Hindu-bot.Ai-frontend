@@ -6,7 +6,8 @@ import type {
   StreamStatusEvent,
 } from './types'
 
-const API_URL = 'http://34.93.159.106:30001'
+/** Empty in production → same-origin `/api/...` (Netlify proxies to GKE). */
+const API_URL = String(import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '')
 
 export function getManualPdfUrl(pageNumber?: number): string {
   const base = `${API_URL}/api/manual`
