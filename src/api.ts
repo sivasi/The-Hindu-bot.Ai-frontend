@@ -6,7 +6,7 @@ import type {
   StreamStatusEvent,
 } from './types'
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001'
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://34.93.159.106:30001'
 
 export function getManualPdfUrl(pageNumber?: number): string {
   const base = `${API_URL}/api/manual`
