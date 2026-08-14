@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ApiError, checkHealth, getManualPdfUrl, queryArchive, queryArchiveStream } from './api'
+import {
+  avatarUrl,
+  clearToken,
+  displayName,
+  fetchMe,
+  getToken,
+  logout,
+} from './auth'
+import type { AuthUser } from './authTypes'
+import { GoogleSignIn } from './components/GoogleSignIn'
 import { JourneyStatus } from './components/JourneyStatus'
 import { MarkdownAnswer } from './components/MarkdownAnswer'
 import { SourceItem } from './components/SourceItem'
@@ -95,6 +105,7 @@ const INSIDE = [
 ] as const
 
 type Status = 'idle' | 'loading' | 'error' | 'done'
+type AuthStatus = 'checking' | 'signed_out' | 'signed_in'
 
 export default function App() {
   const [question, setQuestion] = useState('')
@@ -108,12 +119,15 @@ export default function App() {
   const [showAllSources, setShowAllSources] = useState(false)
   const [streamDraft, setStreamDraft] = useState('')
   const [isStreamingAnswer, setIsStreamingAnswer] = useState(false)
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('checking')
+  const [user, setUser] = useState<AuthUser | null>(null)
   const answerRef = useRef<HTMLElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const streamDraftRef = useRef('')
   const tokenFlushRaf = useRef<number | null>(null)
 
   const mode = resolveMode(turboOn, turboKind)
+  const signedIn = authStatus === 'signed_in'
 
   const editionParts = useMemo(() => {
     const now = new Date()
@@ -155,6 +169,41 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    let cancelled = false
+
+    async function restoreSession() {
+      if (!getToken()) {
+        if (!cancelled) {
+          setUser(null)
+          setAuthStatus('signed_out')
+        }
+        return
+      }
+      try {
+        const me = await fetchMe()
+        if (cancelled) return
+        if (me) {
+          setUser(me)
+          setAuthStatus('signed_in')
+        } else {
+          setUser(null)
+          setAuthStatus('signed_out')
+        }
+      } catch {
+        if (cancelled) return
+        // Token present but /me unavailable — keep session for Ask until a 401.
+        setUser({ name: 'Signed-in reader' })
+        setAuthStatus('signed_in')
+      }
+    }
+
+    void restoreSession()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
     return () => {
       abortRef.current?.abort()
       if (tokenFlushRaf.current != null) {
@@ -162,6 +211,41 @@ export default function App() {
       }
     }
   }, [])
+
+  function handleSignedIn(nextUser: AuthUser) {
+    setUser(nextUser)
+    setAuthStatus('signed_in')
+    setError(null)
+  }
+
+  async function handleLogout() {
+    abortRef.current?.abort()
+    await logout()
+    setUser(null)
+    setAuthStatus('signed_out')
+    setQuestion('')
+    setResult(null)
+    setError(null)
+    setStatus('idle')
+    setJourneyMessage(null)
+    setStreamDraft('')
+    streamDraftRef.current = ''
+    setIsStreamingAnswer(false)
+    setShowAllSources(false)
+  }
+
+  function handleSessionExpired(message?: string) {
+    clearToken()
+    setUser(null)
+    setAuthStatus('signed_out')
+    setResult(null)
+    setJourneyMessage(null)
+    setIsStreamingAnswer(false)
+    setStreamDraft('')
+    streamDraftRef.current = ''
+    setStatus('idle')
+    setError(message || 'Session expired. Please sign in again.')
+  }
 
   function flushStreamDraft() {
     if (tokenFlushRaf.current != null) return
@@ -173,7 +257,7 @@ export default function App() {
   async function handleAsk(e?: FormEvent) {
     e?.preventDefault()
     const trimmed = question.trim()
-    if (!trimmed || status === 'loading') return
+    if (!trimmed || status === 'loading' || !signedIn) return
 
     abortRef.current?.abort()
     const controller = new AbortController()
@@ -249,6 +333,11 @@ export default function App() {
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return
 
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        handleSessionExpired(err.message)
+        return
+      }
+
       // Fallback to blocking /api/query if stream is unavailable
       try {
         setJourneyMessage(
@@ -267,6 +356,13 @@ export default function App() {
           answerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
         })
       } catch (fallbackErr) {
+        if (
+          fallbackErr instanceof ApiError &&
+          (fallbackErr.status === 401 || fallbackErr.status === 403)
+        ) {
+          handleSessionExpired(fallbackErr.message)
+          return
+        }
         const message =
           fallbackErr instanceof ApiError
             ? fallbackErr.message
@@ -286,10 +382,13 @@ export default function App() {
   }
 
   function applySuggestion(text: string) {
+    if (!signedIn || status === 'loading') return
     setQuestion(text)
   }
 
-  const canAsk = question.trim().length > 0 && status !== 'loading'
+  const canAsk = signedIn && question.trim().length > 0 && status !== 'loading'
+  const userLabel = displayName(user)
+  const userAvatar = avatarUrl(user)
   const resultMode =
     result?.meta?.mode ??
     (result?.meta?.turbo ? 'turbo_research' : result ? 'normal' : null)
@@ -320,9 +419,36 @@ export default function App() {
           <div className="masthead-side masthead-right mt-2">
             <div className="masthead-right-top">
               <p className="masthead-follow">ARCHIVE Q&amp;A</p>
-              <p className="masthead-link">Ask the paper</p>
-              <p className="masthead-link">Cited sources</p>
-              <p className="masthead-link">One front page</p>
+              {signedIn ? (
+                <>
+                  <div className="masthead-user">
+                    {userAvatar ? (
+                      <img
+                        className="masthead-user-avatar"
+                        src={userAvatar}
+                        alt=""
+                        width={22}
+                        height={22}
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : null}
+                    <p className="masthead-link masthead-user-name">{userLabel}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="masthead-signout"
+                    onClick={() => void handleLogout()}
+                  >
+                    Sign out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="masthead-link">Ask the paper</p>
+                  <p className="masthead-link">Cited sources</p>
+                  <p className="masthead-link">Sign in required</p>
+                </>
+              )}
             </div>
             <p className="masthead-vol">Vol. Q&amp;A · No. 1</p>
           </div>
@@ -369,7 +495,7 @@ export default function App() {
                 type="button"
                 className="inside-item"
                 onClick={() => applySuggestion(item.q)}
-                disabled={status === 'loading'}
+                disabled={!signedIn || status === 'loading'}
               >
                 <p className="inside-head">{item.head}</p>
                 <p className="inside-snip">{item.snip}</p>
@@ -383,93 +509,102 @@ export default function App() {
                 A living front page for the archive: put your question where the lead
                 headline usually sits, and the desk answers from retrieved newspaper
                 chunks — with sources printed underneath.
-          </p>
-        </div>
+              </p>
+            </div>
 
-            <form onSubmit={handleAsk} className="ask-shell">
-              <label htmlFor="question" className="sr-only">
-                Ask the archive
-              </label>
-              <textarea
-                id="question"
-                name="question"
-                rows={3}
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                placeholder="Type your question as today’s lead headline…"
-                disabled={status === 'loading'}
-                className="ask-input"
-              />
-              <div className="ask-toolbar">
-                <div className="ask-toolbar-left">
-                  <button type="submit" className="ask-btn" disabled={!canAsk}>
-                    {status === 'loading' ? 'Working…' : 'Ask'}
-                  </button>
-
-                  <div className="turbo-panel">
-                    <label
-                      className={`turbo-toggle${turboOn ? ' turbo-toggle-on' : ''}`}
-                      title="Turbo mode: deeper retrieval and more accurate answers"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={turboOn}
-                        onChange={(e) => setTurboOn(e.target.checked)}
-                        disabled={status === 'loading'}
-                      />
-                      <span className="turbo-switch" aria-hidden />
-                      <span className="turbo-label">Turbo mode</span>
-                    </label>
-
-                    {turboOn && (
-                      <div
-                        className="turbo-kind"
-                        role="radiogroup"
-                        aria-label="Turbo answer length"
-                      >
-                        <button
-                          type="button"
-                          role="radio"
-                          aria-checked={turboKind === 'short'}
-                          className={`turbo-kind-option${turboKind === 'short' ? ' turbo-kind-active' : ''}`}
-                          onClick={() => setTurboKind('short')}
-                          disabled={status === 'loading'}
-                        >
-                          Short
-                        </button>
-        <button
-          type="button"
-                          role="radio"
-                          aria-checked={turboKind === 'research'}
-                          className={`turbo-kind-option${turboKind === 'research' ? ' turbo-kind-active' : ''}`}
-                          onClick={() => setTurboKind('research')}
-                          disabled={status === 'loading'}
-                        >
-                          Research
-        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                {status === 'loading' ? (
-                  <div className="loading-bar" aria-hidden />
-                ) : (
-                  <span className="ask-toolbar-hint">{modeHint(mode)}</span>
-                )}
+            {authStatus === 'checking' ? (
+              <div className="auth-gate auth-gate-checking">
+                <p className="auth-kicker">Subscriber desk</p>
+                <p className="auth-status">Checking your press pass…</p>
               </div>
-            </form>
+            ) : !signedIn ? (
+              <GoogleSignIn onSignedIn={handleSignedIn} />
+            ) : (
+              <form onSubmit={handleAsk} className="ask-shell">
+                <label htmlFor="question" className="sr-only">
+                  Ask the archive
+                </label>
+                <textarea
+                  id="question"
+                  name="question"
+                  rows={3}
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  placeholder="Type your question as today’s lead headline…"
+                  disabled={status === 'loading'}
+                  className="ask-input"
+                />
+                <div className="ask-toolbar">
+                  <div className="ask-toolbar-left">
+                    <button type="submit" className="ask-btn" disabled={!canAsk}>
+                      {status === 'loading' ? 'Working…' : 'Ask'}
+                    </button>
 
-            {status === 'loading' && journeyMessage && !isStreamingAnswer && (
+                    <div className="turbo-panel">
+                      <label
+                        className={`turbo-toggle${turboOn ? ' turbo-toggle-on' : ''}`}
+                        title="Turbo mode: deeper retrieval and more accurate answers"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={turboOn}
+                          onChange={(e) => setTurboOn(e.target.checked)}
+                          disabled={status === 'loading'}
+                        />
+                        <span className="turbo-switch" aria-hidden />
+                        <span className="turbo-label">Turbo mode</span>
+                      </label>
+
+                      {turboOn && (
+                        <div
+                          className="turbo-kind"
+                          role="radiogroup"
+                          aria-label="Turbo answer length"
+                        >
+                          <button
+                            type="button"
+                            role="radio"
+                            aria-checked={turboKind === 'short'}
+                            className={`turbo-kind-option${turboKind === 'short' ? ' turbo-kind-active' : ''}`}
+                            onClick={() => setTurboKind('short')}
+                            disabled={status === 'loading'}
+                          >
+                            Short
+                          </button>
+                          <button
+                            type="button"
+                            role="radio"
+                            aria-checked={turboKind === 'research'}
+                            className={`turbo-kind-option${turboKind === 'research' ? ' turbo-kind-active' : ''}`}
+                            onClick={() => setTurboKind('research')}
+                            disabled={status === 'loading'}
+                          >
+                            Research
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {status === 'loading' ? (
+                    <div className="loading-bar" aria-hidden />
+                  ) : (
+                    <span className="ask-toolbar-hint">{modeHint(mode)}</span>
+                  )}
+                </div>
+              </form>
+            )}
+
+            {signedIn && status === 'loading' && journeyMessage && !isStreamingAnswer && (
               <JourneyStatus message={journeyMessage} />
             )}
 
             {error && (
               <div role="alert" className="banner-warn animate-fade-up">
                 {error}
-        </div>
+              </div>
             )}
 
-            {status !== 'done' && status !== 'loading' && (
+            {signedIn && status !== 'done' && status !== 'loading' && (
               <section className="about-block" aria-labelledby="about-heading">
                 <h2 id="about-heading" className="sr-only">
                   About this website
@@ -479,11 +614,10 @@ export default function App() {
                   Instead of scrolling for a story, you ask the paper — and it
                   answers with citations from indexed article chunks.
                 </p>
-               
               </section>
             )}
 
-            {status === 'loading' && isStreamingAnswer && (
+            {signedIn && status === 'loading' && isStreamingAnswer && (
               <section
                 ref={answerRef}
                 className="section-rule scroll-mt-6"
@@ -504,7 +638,7 @@ export default function App() {
               </section>
             )}
 
-            {status === 'done' && result && (
+            {signedIn && status === 'done' && result && (
               <>
                 <section
                   ref={answerRef}
@@ -579,14 +713,20 @@ export default function App() {
         <footer className="site-footer">
           <div className="site-footer-left">
             <p className="site-footer-brand">The Hindu Bot.AI</p>
-            <a
-              className="site-footer-pdf"
-              href={getManualPdfUrl()}
-              target="_blank"
-              rel="noreferrer noopener"
-            >
-              View newspaper PDF »
-            </a>
+            {signedIn ? (
+              <a
+                className="site-footer-pdf"
+                href={getManualPdfUrl()}
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                View newspaper PDF »
+              </a>
+            ) : (
+              <span className="site-footer-pdf site-footer-pdf-muted">
+                Sign in to view newspaper PDF »
+              </span>
+            )}
           </div>
           <p className="site-footer-credit">
             Made with{' '}

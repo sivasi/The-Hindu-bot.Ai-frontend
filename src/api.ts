@@ -5,12 +5,17 @@ import type {
   StreamEvent,
   StreamStatusEvent,
 } from './types'
+import { authHeaders, clearToken, getToken } from './token'
 
 /** Same-origin `/api/...` — Netlify proxies to GKE; Vite proxies locally. */
-const API_URL = ''
+export const API_URL = ''
 
 export function getManualPdfUrl(pageNumber?: number): string {
-  const base = `${API_URL}/api/manual`
+  const token = getToken()
+  const params = new URLSearchParams()
+  if (token) params.set('token', token)
+  const qs = params.toString()
+  const base = `${API_URL}/api/manual${qs ? `?${qs}` : ''}`
   if (typeof pageNumber === 'number' && pageNumber > 0) {
     return `${base}#page=${pageNumber}`
   }
@@ -24,6 +29,13 @@ export class ApiError extends Error {
     super(message)
     this.name = 'ApiError'
     this.status = status
+  }
+}
+
+function throwIfUnauthorized(res: Response): void {
+  if (res.status === 401 || res.status === 403) {
+    clearToken()
+    throw new ApiError('Session expired. Please sign in again.', res.status)
   }
 }
 
@@ -54,9 +66,11 @@ function buildQueryBody(body: QueryRequest) {
 export async function queryArchive(body: QueryRequest): Promise<QueryResponse> {
   const res = await fetch(`${API_URL}/api/query`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(buildQueryBody(body)),
   })
+
+  throwIfUnauthorized(res)
 
   if (!res.ok) {
     let detail = `Request failed (${res.status})`
@@ -108,13 +122,15 @@ export async function queryArchiveStream(
 ): Promise<void> {
   const res = await fetch(`${API_URL}/api/query/stream`, {
     method: 'POST',
-    headers: {
+    headers: authHeaders({
       'Content-Type': 'application/json',
       Accept: 'text/event-stream',
-    },
+    }),
     body: JSON.stringify(buildQueryBody(body)),
     signal: handlers.signal,
   })
+
+  throwIfUnauthorized(res)
 
   if (!res.ok || !res.body) {
     let detail = `HTTP ${res.status}`

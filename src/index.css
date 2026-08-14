@@ -161,6 +161,122 @@
   margin-top: 0;
 }
 
+.masthead-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 100%;
+}
+
+.masthead-user-avatar {
+  width: 1.15rem;
+  height: 1.15rem;
+  object-fit: cover;
+  border: 1px solid var(--rule-light);
+  flex: 0 0 auto;
+}
+
+.masthead-user-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 7.5rem;
+}
+
+.masthead-signout {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--serif);
+  font-size: 0.78rem;
+  line-height: 1.25;
+  color: var(--hindu-red);
+  cursor: pointer;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.masthead-signout:hover {
+  color: var(--ink);
+}
+
+/* Google sign-in gate — sits in the lead headline slot */
+.auth-gate {
+  margin: 0.35rem 0 1rem;
+  padding: 1.1rem 1.15rem 1.2rem;
+  border-top: 2px solid var(--ink);
+  border-bottom: 1px solid var(--rule-light);
+  background: var(--panel-offwhite);
+}
+
+.auth-gate-checking {
+  min-height: 6.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.auth-kicker {
+  margin: 0 0 0.35rem;
+  font-family: var(--sans);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--hindu-red);
+}
+
+.auth-title {
+  margin: 0 0 0.45rem;
+  font-family: var(--serif);
+  font-size: clamp(1.35rem, 2.2vw, 1.85rem);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.auth-blurb {
+  margin: 0 0 0.95rem;
+  max-width: 38rem;
+  font-family: var(--sans);
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+.auth-google-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+  min-height: 2.75rem;
+}
+
+.auth-google-btn {
+  min-height: 40px;
+}
+
+.auth-status {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+}
+
+.auth-error {
+  margin: 0.75rem 0 0;
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  color: var(--danger);
+}
+
+.inside-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .masthead-logo {
   display: flex;
   justify-content: center;
@@ -1015,6 +1131,13 @@
 
 .site-footer-pdf:hover {
   border-bottom-color: var(--hindu-red);
+}
+
+.site-footer-pdf-muted {
+  border-bottom: none;
+  color: var(--ink-faint);
+  cursor: default;
+  font-weight: 600;
 }
 
 .site-footer-credit {
