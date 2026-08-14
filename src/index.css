@@ -202,21 +202,19 @@
   color: var(--ink);
 }
 
-/* Sign-in reuses Ask shell — focal lead box, not a muted placeholder */
-.auth-shell {
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--hindu-red) 18%, transparent);
+/* Sign-in: plain headline + red-focus button (Ask box only after login) */
+.auth-lead {
+  margin: 0.15rem 0 0.25rem;
+  padding: 0 0 0.35rem;
+  max-width: 40rem;
 }
 
-.auth-shell::before {
-  content: 'SIGN IN';
-}
-
-.auth-shell-checking {
-  opacity: 0.95;
+.auth-lead-checking .loading-bar {
+  margin-top: 1rem;
 }
 
 .auth-eyebrow {
-  margin: 0 0 0.55rem;
+  margin: 0 0 0.45rem;
   font-family: var(--sans);
   font-size: 0.7rem;
   font-weight: 700;
@@ -226,57 +224,74 @@
 }
 
 .auth-headline {
-  margin: 0 0 0.55rem;
+  margin: 0 0 0.65rem;
   font-family: var(--serif);
-  font-size: clamp(1.65rem, 3.6vw, 2.35rem);
+  font-size: clamp(1.85rem, 4vw, 2.65rem);
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.15;
   color: var(--ink);
 }
 
 .auth-deck {
-  margin: 0 0 1.15rem;
-  max-width: 36rem;
+  margin: 0 0 1.25rem;
   font-family: var(--serif);
-  font-size: 1.02rem;
+  font-size: 1.05rem;
   font-style: italic;
   line-height: 1.5;
   color: var(--ink-muted);
 }
 
-.auth-cta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.65rem;
-  padding-top: 1rem;
-  border-top: 1px solid color-mix(in srgb, var(--hindu-red) 35%, var(--rule-light));
-}
-
-.auth-google-btn {
+.auth-signin-btn {
+  appearance: none;
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
-}
-
-.auth-google-btn iframe {
-  display: block;
-}
-
-.auth-cta-note {
+  justify-content: center;
   margin: 0;
+  padding: 0.72rem 1.35rem;
+  border: 2px solid var(--hindu-red);
+  background: #fff;
+  color: var(--hindu-red);
   font-family: var(--sans);
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ink-faint);
+  cursor: pointer;
+  line-height: 1.2;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--hindu-red) 16%, transparent);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.auth-signin-btn:hover:not(:disabled) {
+  background: var(--hindu-red);
+  color: #fff;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--hindu-red) 24%, transparent);
+}
+
+.auth-signin-btn:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.auth-signin-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.auth-google-fallback {
+  display: none;
+  margin-top: 0.85rem;
+}
+
+.auth-google-fallback-visible {
+  display: block;
 }
 
 .auth-error {
   margin: 0.9rem 0 0;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--rule-light);
   font-family: var(--sans);
   font-size: 0.82rem;
   color: var(--danger);
@@ -772,7 +787,6 @@
 .about-block {
   margin-top: 0.35rem;
   padding-top: 1.25rem;
-  border-top: 1px solid var(--rule-light);
 }
 
 .about-lead {
@@ -781,7 +795,6 @@
   line-height: 1.55;
   margin: 0 0 0.85rem;
   padding-bottom: 0.85rem;
-  border-bottom: 1px solid var(--rule-light);
 }
 
 .about-lead::first-letter {
@@ -807,6 +820,61 @@
 .about-columns p {
   margin: 0 0 0.75rem;
   break-inside: avoid-column;
+}
+
+.about-subhead {
+  margin: 1.35rem 0 0.85rem;
+  padding-bottom: 0.4rem;
+  font-family: var(--serif);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.about-how {
+  margin-top: 0.35rem;
+}
+
+.about-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem 1.15rem;
+}
+
+.about-steps li {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  margin: 0;
+  padding: 0.15rem 0.15rem 0.15rem 0;
+}
+
+.about-step-num {
+  flex: 0 0 auto;
+  font-family: var(--serif);
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--hindu-red);
+}
+
+.about-step-title {
+  margin: 0 0 0.25rem;
+  font-family: var(--serif);
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.about-step-body {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--ink-muted);
 }
 
 .section-rule {

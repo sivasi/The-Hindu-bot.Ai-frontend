@@ -504,23 +504,22 @@ export default function App() {
           </aside>
 
           <main className="lead-col">
-            <div className="lead-headline-block">
-              <p className="ask-deck">
-                A living front page for the archive: put your question where the lead
-                headline usually sits, and the desk answers from retrieved newspaper
-                chunks — with sources printed underneath.
-              </p>
-            </div>
+            {signedIn && (
+              <div className="lead-headline-block">
+                <p className="ask-deck">
+                  A living front page for the archive: put your question where the lead
+                  headline usually sits, and the desk answers from retrieved newspaper
+                  chunks — with sources printed underneath.
+                </p>
+              </div>
+            )}
 
             {authStatus === 'checking' ? (
-              <div className="ask-shell auth-shell auth-shell-checking">
-                <p className="auth-eyebrow">Press pass</p>
-                <h2 className="auth-headline">Checking your credentials…</h2>
-                <div className="auth-cta">
-                  <div className="loading-bar" aria-hidden />
-                  <p className="auth-cta-note">One moment</p>
-                </div>
-              </div>
+              <section className="auth-lead auth-lead-checking">
+                <p className="auth-eyebrow">Archive edition</p>
+                <h2 className="auth-headline">Checking your press pass…</h2>
+                <div className="loading-bar" aria-hidden />
+              </section>
             ) : !signedIn ? (
               <GoogleSignIn onSignedIn={handleSignedIn} />
             ) : (
@@ -618,6 +617,44 @@ export default function App() {
                   Instead of scrolling for a story, you ask the paper — and it
                   answers with citations from indexed article chunks.
                 </p>
+
+                {!signedIn && (
+                  <div className="about-how">
+                    <h3 className="about-subhead">How the desk works</h3>
+                    <ol className="about-steps">
+                      <li>
+                        <span className="about-step-num">1</span>
+                        <div>
+                          <p className="about-step-title">Sign in</p>
+                          <p className="about-step-body">
+                            Open the edition with Google. No chat history — one front
+                            page, one question at a time.
+                          </p>
+                        </div>
+                      </li>
+                      <li>
+                        <span className="about-step-num">2</span>
+                        <div>
+                          <p className="about-step-title">Ask the lead</p>
+                          <p className="about-step-body">
+                            Put your question in the headline slot. Use Inside briefs
+                            if you want a ready-made prompt.
+                          </p>
+                        </div>
+                      </li>
+                      <li>
+                        <span className="about-step-num">3</span>
+                        <div>
+                          <p className="about-step-title">Read with citations</p>
+                          <p className="about-step-body">
+                            Follow the journey line, then the answer and sources —
+                            jump to the PDF page when you need the full clip.
+                          </p>
+                        </div>
+                      </li>
+                    </ol>
+                  </div>
+                )}
               </section>
             )}
 
