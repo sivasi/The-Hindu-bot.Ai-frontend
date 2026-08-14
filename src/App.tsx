@@ -556,6 +556,91 @@ export default function App() {
   const userLabel = displayName(user)
   const userAvatar = avatarUrl(user)
   const chatBusy = status === 'loading'
+  const hasThread = messages.length > 0
+
+  function renderAskForm(compact: boolean) {
+    return (
+      <form
+        onSubmit={handleAsk}
+        className={`ask-shell${compact ? ' ask-shell-compact' : ''}`}
+      >
+        <label htmlFor={compact ? 'question-followup' : 'question'} className="sr-only">
+          {compact ? 'Continue this chat' : 'Ask the archive'}
+        </label>
+        <textarea
+          id={compact ? 'question-followup' : 'question'}
+          name="question"
+          rows={compact ? 2 : 3}
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder={
+            compact
+              ? 'Ask a follow-up in this chat…'
+              : 'Type your question as today’s lead headline…'
+          }
+          disabled={status === 'loading'}
+          className="ask-input"
+        />
+        <div className="ask-toolbar">
+          <div className="ask-toolbar-left">
+            <button type="submit" className="ask-btn" disabled={!canAsk}>
+              {status === 'loading' ? 'Working…' : compact ? 'Send' : 'Ask'}
+            </button>
+
+            <div className="turbo-panel">
+              <label
+                className={`turbo-toggle${turboOn ? ' turbo-toggle-on' : ''}`}
+                title="Turbo mode: deeper retrieval and more accurate answers"
+              >
+                <input
+                  type="checkbox"
+                  checked={turboOn}
+                  onChange={(e) => setTurboOn(e.target.checked)}
+                  disabled={status === 'loading'}
+                />
+                <span className="turbo-switch" aria-hidden />
+                <span className="turbo-label">Turbo mode</span>
+              </label>
+
+              {turboOn && (
+                <div
+                  className="turbo-kind"
+                  role="radiogroup"
+                  aria-label="Turbo answer length"
+                >
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={turboKind === 'short'}
+                    className={`turbo-kind-option${turboKind === 'short' ? ' turbo-kind-active' : ''}`}
+                    onClick={() => setTurboKind('short')}
+                    disabled={status === 'loading'}
+                  >
+                    Short
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={turboKind === 'research'}
+                    className={`turbo-kind-option${turboKind === 'research' ? ' turbo-kind-active' : ''}`}
+                    onClick={() => setTurboKind('research')}
+                    disabled={status === 'loading'}
+                  >
+                    Research
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          {status === 'loading' ? (
+            <div className="loading-bar" aria-hidden />
+          ) : (
+            <span className="ask-toolbar-hint">{modeHint(mode)}</span>
+          )}
+        </div>
+      </form>
+    )
+  }
 
   return (
     <div className="app-shell">
@@ -583,36 +668,9 @@ export default function App() {
           <div className="masthead-side masthead-right mt-2">
             <div className="masthead-right-top">
               <p className="masthead-follow">ARCHIVE Q&amp;A</p>
-              {signedIn ? (
-                <>
-                  <div className="masthead-user">
-                    {userAvatar ? (
-                      <img
-                        className="masthead-user-avatar"
-                        src={userAvatar}
-                        alt=""
-                        width={22}
-                        height={22}
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : null}
-                    <p className="masthead-link masthead-user-name">{userLabel}</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="masthead-signout"
-                    onClick={() => void handleLogout()}
-                  >
-                    Sign out
-                  </button>
-                </>
-              ) : (
-                <>
-                  <p className="masthead-link">Ask the paper</p>
-                  <p className="masthead-link">Cited sources</p>
-                  <p className="masthead-link">Sign in required</p>
-                </>
-              )}
+              <p className="masthead-link">Ask the paper</p>
+              <p className="masthead-link">Cited sources</p>
+              <p className="masthead-link">One front page</p>
             </div>
             <p className="masthead-vol">Vol. Q&amp;A · No. 1</p>
           </div>
@@ -657,10 +715,15 @@ export default function App() {
               activeId={activeSessionId}
               loading={chatsLoading}
               busy={chatBusy}
+              userName={userLabel}
+              userAvatar={userAvatar}
+              suggestions={INSIDE}
               onNewChat={handleNewChat}
               onSelect={(id) => void handleSelectChat(id)}
               onRename={(id, title) => handleRenameChat(id, title)}
               onDelete={(id) => handleDeleteChat(id)}
+              onLogout={() => void handleLogout()}
+              onSuggest={applySuggestion}
             />
           ) : (
             <aside className="inside-col" aria-label="Inside">
@@ -681,12 +744,11 @@ export default function App() {
           )}
 
           <main className="lead-col">
-            {signedIn && (
+            {signedIn && !hasThread && (
               <div className="lead-headline-block">
                 <p className="ask-deck">
-                  {activeSessionId
-                    ? 'Continue this thread in the lead — answers stay grounded in archive sources.'
-                    : 'A living front page for the archive: put your question where the lead headline usually sits. A new chat is created on your first Ask.'}
+                  A living front page for the archive: put your question where the lead
+                  headline usually sits. A new chat is created on your first Ask.
                 </p>
               </div>
             )}
@@ -699,88 +761,51 @@ export default function App() {
               </section>
             ) : !signedIn ? (
               <GoogleSignIn onSignedIn={handleSignedIn} />
-            ) : (
-              <form onSubmit={handleAsk} className="ask-shell">
-                <label htmlFor="question" className="sr-only">
-                  Ask the archive
-                </label>
-                <textarea
-                  id="question"
-                  name="question"
-                  rows={3}
-                  value={question}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  placeholder="Type your question as today’s lead headline…"
-                  disabled={status === 'loading'}
-                  className="ask-input"
+            ) : !hasThread ? (
+              renderAskForm(false)
+            ) : null}
+
+            {signedIn && hasThread && (
+              <section ref={answerRef} className="chat-thread-wrap scroll-mt-6">
+                <ChatThread
+                  messages={messages}
+                  showAllSources={showAllSources}
+                  onToggleSources={() => setShowAllSources((v) => !v)}
                 />
-                <div className="ask-toolbar">
-                  <div className="ask-toolbar-left">
-                    <button type="submit" className="ask-btn" disabled={!canAsk}>
-                      {status === 'loading' ? 'Working…' : 'Ask'}
-                    </button>
-
-                    <div className="turbo-panel">
-                      <label
-                        className={`turbo-toggle${turboOn ? ' turbo-toggle-on' : ''}`}
-                        title="Turbo mode: deeper retrieval and more accurate answers"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={turboOn}
-                          onChange={(e) => setTurboOn(e.target.checked)}
-                          disabled={status === 'loading'}
-                        />
-                        <span className="turbo-switch" aria-hidden />
-                        <span className="turbo-label">Turbo mode</span>
-                      </label>
-
-                      {turboOn && (
-                        <div
-                          className="turbo-kind"
-                          role="radiogroup"
-                          aria-label="Turbo answer length"
-                        >
-                          <button
-                            type="button"
-                            role="radio"
-                            aria-checked={turboKind === 'short'}
-                            className={`turbo-kind-option${turboKind === 'short' ? ' turbo-kind-active' : ''}`}
-                            onClick={() => setTurboKind('short')}
-                            disabled={status === 'loading'}
-                          >
-                            Short
-                          </button>
-                          <button
-                            type="button"
-                            role="radio"
-                            aria-checked={turboKind === 'research'}
-                            className={`turbo-kind-option${turboKind === 'research' ? ' turbo-kind-active' : ''}`}
-                            onClick={() => setTurboKind('research')}
-                            disabled={status === 'loading'}
-                          >
-                            Research
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  {status === 'loading' ? (
-                    <div className="loading-bar" aria-hidden />
-                  ) : (
-                    <span className="ask-toolbar-hint">{modeHint(mode)}</span>
-                  )}
-                </div>
-              </form>
+              </section>
             )}
 
             {signedIn && status === 'loading' && journeyMessage && !isStreamingAnswer && (
               <JourneyStatus message={journeyMessage} />
             )}
 
+            {signedIn && status === 'loading' && isStreamingAnswer && (
+              <section className="section-rule scroll-mt-6" aria-labelledby="stream-heading">
+                <h2 id="stream-heading" className="section-label">
+                  Answer
+                </h2>
+                <p className="answer-mode-note">Turbo Research · streaming</p>
+                {streamDraft ? (
+                  <StreamingAnswer text={streamDraft} />
+                ) : (
+                  <p className="answer-stream-waiting">
+                    <span className="answer-caret" aria-hidden />
+                    Writing…
+                  </p>
+                )}
+              </section>
+            )}
+
             {error && (
               <div role="alert" className="banner-warn animate-fade-up">
                 {error}
+              </div>
+            )}
+
+            {signedIn && hasThread && (
+              <div className="chat-followup">
+                <p className="chat-followup-label">Continue this chat</p>
+                {renderAskForm(true)}
               </div>
             )}
 
@@ -833,34 +858,7 @@ export default function App() {
               </section>
             )}
 
-            {signedIn && messages.length > 0 && (
-              <section ref={answerRef} className="section-rule scroll-mt-6">
-                <ChatThread
-                  messages={messages}
-                  showAllSources={showAllSources}
-                  onToggleSources={() => setShowAllSources((v) => !v)}
-                />
-              </section>
-            )}
-
-            {signedIn && status === 'loading' && isStreamingAnswer && (
-              <section className="section-rule scroll-mt-6" aria-labelledby="stream-heading">
-                <h2 id="stream-heading" className="section-label">
-                  Answer
-                </h2>
-                <p className="answer-mode-note">Turbo Research · streaming</p>
-                {streamDraft ? (
-                  <StreamingAnswer text={streamDraft} />
-                ) : (
-                  <p className="answer-stream-waiting">
-                    <span className="answer-caret" aria-hidden />
-                    Writing…
-                  </p>
-                )}
-              </section>
-            )}
-
-            {signedIn && status === 'idle' && messages.length === 0 && !result && (
+            {signedIn && status === 'idle' && !hasThread && !result && (
               <section className="about-block">
                 <p className="about-lead">
                   Start a new lead above, or open a previous chat from the Inside

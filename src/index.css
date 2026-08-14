@@ -161,47 +161,6 @@
   margin-top: 0;
 }
 
-.masthead-user {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  max-width: 100%;
-}
-
-.masthead-user-avatar {
-  width: 1.15rem;
-  height: 1.15rem;
-  object-fit: cover;
-  border: 1px solid var(--rule-light);
-  flex: 0 0 auto;
-}
-
-.masthead-user-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 7.5rem;
-}
-
-.masthead-signout {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  font-family: var(--serif);
-  font-size: 0.78rem;
-  line-height: 1.25;
-  color: var(--hindu-red);
-  cursor: pointer;
-  text-align: left;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.masthead-signout:hover {
-  color: var(--ink);
-}
-
 /* Sign-in: plain headline + red-focus button (Ask box only after login) */
 .auth-lead {
   margin: 0.15rem 0 0.25rem;
@@ -303,6 +262,17 @@
 }
 
 /* Chat history in the Inside column */
+.chat-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 28rem;
+}
+
+.chat-sidebar-top {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .chat-sidebar-head {
   display: flex;
   flex-direction: column;
@@ -348,6 +318,101 @@
   font-style: italic;
   line-height: 1.4;
   color: var(--ink-muted);
+}
+
+.chat-inside-list {
+  margin-top: 0.15rem;
+}
+
+.chat-sidebar-user {
+  margin-top: auto;
+  padding-top: 1rem;
+}
+
+.chat-sidebar-user-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.75rem 0 0.15rem;
+  border-top: 1px solid var(--rule-light);
+  background: transparent;
+}
+
+.chat-sidebar-user-avatar {
+  width: 2.15rem;
+  height: 2.15rem;
+  object-fit: cover;
+  border: 1px solid var(--rule-light);
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.chat-sidebar-user-fallback {
+  width: 2.15rem;
+  height: 2.15rem;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--rule-light);
+  border-radius: 50%;
+  background: var(--panel-offwhite);
+  font-family: var(--serif);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.chat-sidebar-user-meta {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.chat-sidebar-user-kicker {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--hindu-red);
+}
+
+.chat-sidebar-user-name {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--serif);
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--ink);
+}
+
+.chat-sidebar-signout {
+  margin: 0.2rem 0 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  align-self: flex-start;
+  font-family: var(--sans);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.25;
+  color: var(--ink-muted);
+  cursor: pointer;
+  text-align: left;
+}
+
+.chat-sidebar-signout:hover {
+  color: var(--hindu-red);
 }
 
 .chat-session-list {
@@ -786,6 +851,74 @@
   font-weight: 700;
   letter-spacing: 0.14em;
   color: var(--hindu-red);
+}
+
+.ask-shell-compact {
+  padding: 0.65rem 0.75rem 0.6rem;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--hindu-red) 10%, transparent);
+}
+
+.ask-shell-compact::before {
+  content: 'FOLLOW-UP';
+  font-size: 0.58rem;
+  top: -0.48rem;
+}
+
+.ask-shell-compact .ask-input {
+  min-height: 2.6rem;
+  padding: 0.15rem 0 0.45rem;
+  font-size: 0.95rem;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.ask-shell-compact .ask-input::placeholder {
+  font-weight: 400;
+  color: #8a8a8a;
+}
+
+.ask-shell-compact .ask-toolbar {
+  padding-top: 0.55rem;
+  margin-top: 0;
+  gap: 0.55rem 0.75rem;
+}
+
+.ask-shell-compact .ask-btn {
+  padding: 0.4rem 0.85rem;
+  font-size: 0.68rem;
+}
+
+.ask-shell-compact .ask-toolbar-hint {
+  font-size: 0.62rem;
+}
+
+.ask-shell-compact .turbo-label {
+  font-size: 0.68rem;
+}
+
+.ask-shell-compact .turbo-kind-option {
+  padding: 0.28rem 0.5rem;
+  font-size: 0.62rem;
+}
+
+.chat-thread-wrap {
+  margin-top: 0.15rem;
+}
+
+.chat-followup {
+  margin-top: 0.35rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--rule-light);
+}
+
+.chat-followup-label {
+  margin: 0 0 0.65rem;
+  font-family: var(--sans);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
 }
 
 .ask-input {

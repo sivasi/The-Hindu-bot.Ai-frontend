@@ -2,15 +2,26 @@ import { useEffect, useRef, useState } from 'react'
 import { relativeTime } from '../chats'
 import type { ChatSession } from '../types'
 
+export type InsideSuggestion = {
+  head: string
+  snip: string
+  q: string
+}
+
 type ChatSidebarProps = {
   sessions: ChatSession[]
   activeId: string | null
   loading?: boolean
   busy?: boolean
+  userName: string
+  userAvatar: string | null
+  suggestions: readonly InsideSuggestion[]
   onNewChat: () => void
   onSelect: (id: string) => void
   onRename: (id: string, title: string) => Promise<void> | void
   onDelete: (id: string) => Promise<void> | void
+  onLogout: () => void
+  onSuggest: (question: string) => void
 }
 
 export function ChatSidebar({
@@ -18,10 +29,15 @@ export function ChatSidebar({
   activeId,
   loading,
   busy,
+  userName,
+  userAvatar,
+  suggestions,
   onNewChat,
   onSelect,
   onRename,
   onDelete,
+  onLogout,
+  onSuggest,
 }: ChatSidebarProps) {
   const [menuId, setMenuId] = useState<string | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -51,120 +67,170 @@ export function ChatSidebar({
     await onRename(id, next)
   }
 
+  const showInside = !loading && sessions.length === 0
+  const showNewChat = sessions.length > 0
+
   return (
     <aside className="inside-col chat-sidebar" aria-label="Chat history">
-      <div className="chat-sidebar-head">
-        <h2 className="inside-title">Chats</h2>
-        <button
-          type="button"
-          className="chat-new-btn"
-          onClick={onNewChat}
-          disabled={busy}
-        >
-          New chat
-        </button>
-      </div>
+      <div className="chat-sidebar-top">
+        <div className="chat-sidebar-head">
+          <h2 className="inside-title">{showInside ? 'Inside' : 'Chats'}</h2>
+          {showNewChat && (
+            <button
+              type="button"
+              className="chat-new-btn"
+              onClick={onNewChat}
+              disabled={busy}
+            >
+              New chat
+            </button>
+          )}
+        </div>
 
-      {loading ? (
-        <p className="chat-sidebar-empty">Loading sessions…</p>
-      ) : sessions.length === 0 ? (
-        <p className="chat-sidebar-empty">
-          No chats yet. Ask a question to start a thread.
-        </p>
-      ) : (
-        <ul className="chat-session-list">
-          {sessions.map((session) => {
-            const active = session.id === activeId
-            const renaming = renamingId === session.id
-            return (
-              <li
-                key={session.id}
-                className={`chat-session-item${active ? ' chat-session-active' : ''}`}
+        {loading ? (
+          <p className="chat-sidebar-empty">Loading sessions…</p>
+        ) : showInside ? (
+          <div className="chat-inside-list">
+            {suggestions.map((item) => (
+              <button
+                key={item.head}
+                type="button"
+                className="inside-item"
+                onClick={() => onSuggest(item.q)}
+                disabled={busy}
               >
-                {renaming ? (
-                  <form
-                    className="chat-rename-form"
-                    onSubmit={(e) => {
-                      e.preventDefault()
-                      void commitRename(session.id)
-                    }}
-                  >
-                    <input
-                      className="chat-rename-input"
-                      value={renameValue}
-                      onChange={(e) => setRenameValue(e.target.value)}
-                      autoFocus
-                      onBlur={() => void commitRename(session.id)}
-                      disabled={busy}
-                    />
-                  </form>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      className="chat-session-main"
-                      onClick={() => onSelect(session.id)}
-                      disabled={busy}
+                <p className="inside-head">{item.head}</p>
+                <p className="inside-snip">{item.snip}</p>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <ul className="chat-session-list">
+            {sessions.map((session) => {
+              const active = session.id === activeId
+              const renaming = renamingId === session.id
+              return (
+                <li
+                  key={session.id}
+                  className={`chat-session-item${active ? ' chat-session-active' : ''}`}
+                >
+                  {renaming ? (
+                    <form
+                      className="chat-rename-form"
+                      onSubmit={(e) => {
+                        e.preventDefault()
+                        void commitRename(session.id)
+                      }}
                     >
-                      <p className="chat-session-title">
-                        {session.title || 'New chat'}
-                      </p>
-                      {session.preview ? (
-                        <p className="chat-session-preview">{session.preview}</p>
-                      ) : null}
-                      <p className="chat-session-time">
-                        {relativeTime(session.lastMessageAt || session.createdAt)}
-                      </p>
-                    </button>
-                    <div
-                      className="chat-session-menu-wrap"
-                      ref={menuId === session.id ? menuRef : undefined}
-                    >
+                      <input
+                        className="chat-rename-input"
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        autoFocus
+                        onBlur={() => void commitRename(session.id)}
+                        disabled={busy}
+                      />
+                    </form>
+                  ) : (
+                    <>
                       <button
                         type="button"
-                        className="chat-session-menu-btn"
-                        aria-label="Chat options"
-                        aria-expanded={menuId === session.id}
+                        className="chat-session-main"
+                        onClick={() => onSelect(session.id)}
                         disabled={busy}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setMenuId((cur) =>
-                            cur === session.id ? null : session.id,
-                          )
-                        }}
                       >
-                        ⋯
+                        <p className="chat-session-title">
+                          {session.title || 'New chat'}
+                        </p>
+                        {session.preview ? (
+                          <p className="chat-session-preview">{session.preview}</p>
+                        ) : null}
+                        <p className="chat-session-time">
+                          {relativeTime(session.lastMessageAt || session.createdAt)}
+                        </p>
                       </button>
-                      {menuId === session.id ? (
-                        <div className="chat-session-menu" role="menu">
-                          <button
-                            type="button"
-                            role="menuitem"
-                            onClick={() => startRename(session)}
-                          >
-                            Rename
-                          </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="chat-session-menu-danger"
-                            onClick={() => {
-                              setMenuId(null)
-                              void onDelete(session.id)
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                  </>
-                )}
-              </li>
-            )
-          })}
-        </ul>
-      )}
+                      <div
+                        className="chat-session-menu-wrap"
+                        ref={menuId === session.id ? menuRef : undefined}
+                      >
+                        <button
+                          type="button"
+                          className="chat-session-menu-btn"
+                          aria-label="Chat options"
+                          aria-expanded={menuId === session.id}
+                          disabled={busy}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setMenuId((cur) =>
+                              cur === session.id ? null : session.id,
+                            )
+                          }}
+                        >
+                          ⋯
+                        </button>
+                        {menuId === session.id ? (
+                          <div className="chat-session-menu" role="menu">
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => startRename(session)}
+                            >
+                              Rename
+                            </button>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className="chat-session-menu-danger"
+                              onClick={() => {
+                                setMenuId(null)
+                                void onDelete(session.id)
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    </>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+
+      <div className="chat-sidebar-user">
+        <div className="chat-sidebar-user-card">
+          {userAvatar ? (
+            <img
+              className="chat-sidebar-user-avatar"
+              src={userAvatar}
+              alt=""
+              width={36}
+              height={36}
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <span className="chat-sidebar-user-fallback" aria-hidden>
+              {userName.slice(0, 1).toUpperCase()}
+            </span>
+          )}
+          <div className="chat-sidebar-user-meta">
+            <p className="chat-sidebar-user-kicker">Signed in</p>
+            <p className="chat-sidebar-user-name" title={userName}>
+              {userName}
+            </p>
+            <button
+              type="button"
+              className="chat-sidebar-signout"
+              onClick={onLogout}
+            >
+              Sign out »
+            </button>
+          </div>
+        </div>
+      </div>
     </aside>
   )
 }
