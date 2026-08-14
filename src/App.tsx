@@ -513,9 +513,12 @@ export default function App() {
             </div>
 
             {authStatus === 'checking' ? (
-              <div className="auth-gate auth-gate-checking">
-                <p className="auth-kicker">Subscriber desk</p>
-                <p className="auth-status">Checking your press pass…</p>
+              <div className="ask-shell auth-shell auth-shell-checking">
+                <p className="auth-lead-line">Checking your press pass…</p>
+                <div className="ask-toolbar">
+                  <div className="loading-bar" aria-hidden />
+                  <span className="ask-toolbar-hint">One moment</span>
+                </div>
               </div>
             ) : !signedIn ? (
               <GoogleSignIn onSignedIn={handleSignedIn} />

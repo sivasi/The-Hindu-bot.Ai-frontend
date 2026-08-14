@@ -140,10 +140,10 @@ export function GoogleSignIn({ onSignedIn, onError }: GoogleSignInProps) {
           type: 'standard',
           theme: 'outline',
           size: 'large',
-          text: 'signin_with',
+          text: 'continue_with',
           shape: 'rectangular',
           logo_alignment: 'left',
-          width: 280,
+          width: 240,
         })
         if (!cancelled) setReady(true)
       } catch (err) {
@@ -165,25 +165,26 @@ export function GoogleSignIn({ onSignedIn, onError }: GoogleSignInProps) {
     }
   }, [])
 
+  const hint = busy
+    ? 'Signing in…'
+    : ready
+      ? 'Continue with Google to ask'
+      : 'Preparing press pass…'
+
   return (
-    <div className="auth-gate animate-fade-up">
-      <p className="auth-kicker">Subscriber desk</p>
-      <h2 className="auth-title">Sign in to open this edition</h2>
-      <p className="auth-blurb">
-        Use Google to reach the archive desk. No redirect to the API host — your
-        browser stays on this front page.
-      </p>
-      <div className="auth-google-wrap" aria-busy={busy || !ready}>
-        <div ref={buttonRef} className="auth-google-btn" />
-        {(busy || !ready) && (
-          <p className="auth-status">{busy ? 'Signing in…' : 'Loading Google…'}</p>
-        )}
+    <div className="ask-shell auth-shell animate-fade-up" aria-busy={busy || !ready}>
+      <p className="auth-lead-line">Sign in to unlock today’s lead…</p>
+      <div className="ask-toolbar">
+        <div className="ask-toolbar-left">
+          <div ref={buttonRef} className="auth-google-btn" />
+        </div>
+        <span className="ask-toolbar-hint">{hint}</span>
       </div>
-      {localError && (
+      {localError ? (
         <p className="auth-error" role="alert">
           {localError}
         </p>
-      )}
+      ) : null}
     </div>
   )
 }
