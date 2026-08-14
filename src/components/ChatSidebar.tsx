@@ -25,6 +25,8 @@ type ChatSidebarProps = {
   onSelect: (id: string) => void
   onLogout: () => void
   onSuggest: (question: string) => void
+  onClose?: () => void
+  showClose?: boolean
 }
 
 export function ChatSidebar({
@@ -39,22 +41,51 @@ export function ChatSidebar({
   onSelect,
   onLogout,
   onSuggest,
+  onClose,
+  showClose,
 }: ChatSidebarProps) {
   const showInside = !loading && sessions.length === 0
   const showNewChat = sessions.length > 0
+
+  function selectSession(id: string) {
+    onSelect(id)
+    onClose?.()
+  }
+
+  function suggest(q: string) {
+    onSuggest(q)
+    onClose?.()
+  }
+
+  function startNewChat() {
+    onNewChat()
+    onClose?.()
+  }
 
   return (
     <aside className="inside-col chat-sidebar" aria-label="Chat history">
       <div className="chat-sidebar-top">
         <div className="chat-sidebar-head">
-          <h2 className={`inside-title${showInside ? '' : ' chat-title'}`}>
-            {showInside ? 'Inside' : 'Chats'}
-          </h2>
+          <div className="chat-sidebar-title-row">
+            <h2 className={`inside-title${showInside ? '' : ' chat-title'}`}>
+              {showInside ? 'Inside' : 'Chats'}
+            </h2>
+            {showClose ? (
+              <button
+                type="button"
+                className="mobile-drawer-close"
+                onClick={onClose}
+                aria-label="Close menu"
+              >
+                ✕
+              </button>
+            ) : null}
+          </div>
           {showNewChat && (
             <button
               type="button"
               className="chat-new-btn"
-              onClick={onNewChat}
+              onClick={startNewChat}
               disabled={busy}
             >
               New chat
@@ -71,7 +102,7 @@ export function ChatSidebar({
                 key={item.head}
                 type="button"
                 className="inside-item"
-                onClick={() => onSuggest(item.q)}
+                onClick={() => suggest(item.q)}
                 disabled={busy}
               >
                 <p className="inside-head">{item.head}</p>
@@ -96,7 +127,7 @@ export function ChatSidebar({
                   <button
                     type="button"
                     className="inside-item chat-session-main"
-                    onClick={() => onSelect(session.id)}
+                    onClick={() => selectSession(session.id)}
                     disabled={busy}
                   >
                     <p className="inside-head">{session.title || 'New chat'}</p>

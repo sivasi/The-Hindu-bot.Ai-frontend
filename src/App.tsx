@@ -138,6 +138,7 @@ export default function App() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [chatsLoading, setChatsLoading] = useState(false)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const answerRef = useRef<HTMLElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const streamDraftRef = useRef('')
@@ -281,6 +282,7 @@ export default function App() {
     setActiveSessionId(null)
     setMessages([])
     resetThreadUi()
+    setMobileNavOpen(false)
   }
 
   function handleSessionExpired(message?: string) {
@@ -299,6 +301,7 @@ export default function App() {
     setActiveSessionId(null)
     setMessages([])
     resetThreadUi()
+    setMobileNavOpen(false)
   }
 
   async function handleSelectChat(id: string) {
@@ -612,9 +615,9 @@ export default function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${mobileNavOpen ? ' mobile-nav-open' : ''}`}>
       <div className="paper">
-        <header className="masthead">
+        <header className="masthead masthead-desktop">
           <h1 className="sr-only">The Hindu Archive Q&amp;A</h1>
 
           <div className="masthead-side masthead-left mt-2">
@@ -645,7 +648,35 @@ export default function App() {
           </div>
         </header>
 
-        <div className="city-bar" aria-hidden>
+        <header className="masthead-mobile">
+          <button
+            type="button"
+            className="mobile-menu-btn"
+            aria-label={mobileNavOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileNavOpen}
+            onClick={() => setMobileNavOpen((v) => !v)}
+          >
+            <span className="mobile-menu-icon" aria-hidden>
+              <span />
+              <span />
+              <span />
+            </span>
+          </button>
+          <div className="masthead-mobile-center">
+            <img
+              className="masthead-mobile-logo"
+              src="/hindu-masthead.png"
+              alt="The Hindu"
+              width={280}
+              height={40}
+              decoding="async"
+            />
+            <p className="masthead-mobile-date">{editionParts.date}</p>
+          </div>
+          <span className="masthead-mobile-spacer" aria-hidden />
+        </header>
+
+        <div className="city-bar city-bar-desktop" aria-hidden>
           {CITIES.map((city, i) => (
             <span key={city} className="city-group">
               <span className="city-name">{city}</span>
@@ -664,7 +695,7 @@ export default function App() {
           </div>
         )}
 
-        <section className="feature-row" aria-label="About this website">
+        <section className="feature-row feature-row-desktop" aria-label="About this website">
           {FEATURES.map((f) => (
             <article
               key={f.title}
@@ -677,38 +708,62 @@ export default function App() {
           ))}
         </section>
 
+        <button
+          type="button"
+          className={`mobile-drawer-backdrop${mobileNavOpen ? ' is-open' : ''}`}
+          aria-label="Close menu"
+          onClick={() => setMobileNavOpen(false)}
+        />
+
         <div className={`page-grid${signedIn ? ' page-grid-chats' : ''}`}>
-          {signedIn ? (
-            <ChatSidebar
-              sessions={sessions}
-              activeId={activeSessionId}
-              loading={chatsLoading}
-              busy={chatBusy}
-              userName={userLabel}
-              userAvatar={userAvatar}
-              suggestions={INSIDE}
-              onNewChat={handleNewChat}
-              onSelect={(id) => void handleSelectChat(id)}
-              onLogout={() => void handleLogout()}
-              onSuggest={applySuggestion}
-            />
-          ) : (
-            <aside className="inside-col" aria-label="Inside">
-              <h2 className="inside-title">Inside</h2>
-              {INSIDE.map((item) => (
-                <button
-                  key={item.head}
-                  type="button"
-                  className="inside-item"
-                  onClick={() => applySuggestion(item.q)}
-                  disabled
-                >
-                  <p className="inside-head">{item.head}</p>
-                  <p className="inside-snip">{item.snip}</p>
-                </button>
-              ))}
-            </aside>
-          )}
+          <div className={`sidebar-slot${mobileNavOpen ? ' is-open' : ''}`}>
+            {signedIn ? (
+              <ChatSidebar
+                sessions={sessions}
+                activeId={activeSessionId}
+                loading={chatsLoading}
+                busy={chatBusy}
+                userName={userLabel}
+                userAvatar={userAvatar}
+                suggestions={INSIDE}
+                onNewChat={handleNewChat}
+                onSelect={(id) => void handleSelectChat(id)}
+                onLogout={() => void handleLogout()}
+                onSuggest={applySuggestion}
+                onClose={() => setMobileNavOpen(false)}
+                showClose
+              />
+            ) : (
+              <aside className="inside-col" aria-label="Inside">
+                <div className="chat-sidebar-title-row">
+                  <h2 className="inside-title">Inside</h2>
+                  <button
+                    type="button"
+                    className="mobile-drawer-close"
+                    onClick={() => setMobileNavOpen(false)}
+                    aria-label="Close menu"
+                  >
+                    ✕
+                  </button>
+                </div>
+                {INSIDE.map((item) => (
+                  <button
+                    key={item.head}
+                    type="button"
+                    className="inside-item"
+                    onClick={() => {
+                      applySuggestion(item.q)
+                      setMobileNavOpen(false)
+                    }}
+                    disabled={!signedIn || status === 'loading'}
+                  >
+                    <p className="inside-head">{item.head}</p>
+                    <p className="inside-snip">{item.snip}</p>
+                  </button>
+                ))}
+              </aside>
+            )}
+          </div>
 
           <main className="lead-col">
             {signedIn && !hasThread && (
