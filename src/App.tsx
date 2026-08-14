@@ -514,10 +514,11 @@ export default function App() {
 
             {authStatus === 'checking' ? (
               <div className="ask-shell auth-shell auth-shell-checking">
-                <p className="auth-lead-line">Checking your press pass…</p>
-                <div className="ask-toolbar">
+                <p className="auth-eyebrow">Press pass</p>
+                <h2 className="auth-headline">Checking your credentials…</h2>
+                <div className="auth-cta">
                   <div className="loading-bar" aria-hidden />
-                  <span className="ask-toolbar-hint">One moment</span>
+                  <p className="auth-cta-note">One moment</p>
                 </div>
               </div>
             ) : !signedIn ? (
@@ -607,7 +608,7 @@ export default function App() {
               </div>
             )}
 
-            {signedIn && status !== 'done' && status !== 'loading' && (
+            {(!signedIn || (status !== 'done' && status !== 'loading')) && (
               <section className="about-block" aria-labelledby="about-heading">
                 <h2 id="about-heading" className="sr-only">
                   About this website

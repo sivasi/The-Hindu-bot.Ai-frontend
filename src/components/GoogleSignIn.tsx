@@ -143,7 +143,7 @@ export function GoogleSignIn({ onSignedIn, onError }: GoogleSignInProps) {
           text: 'continue_with',
           shape: 'rectangular',
           logo_alignment: 'left',
-          width: 240,
+          width: 320,
         })
         if (!cancelled) setReady(true)
       } catch (err) {
@@ -165,21 +165,22 @@ export function GoogleSignIn({ onSignedIn, onError }: GoogleSignInProps) {
     }
   }, [])
 
-  const hint = busy
-    ? 'Signing in…'
-    : ready
-      ? 'Continue with Google to ask'
-      : 'Preparing press pass…'
-
   return (
     <div className="ask-shell auth-shell animate-fade-up" aria-busy={busy || !ready}>
-      <p className="auth-lead-line">Sign in to unlock today’s lead…</p>
-      <div className="ask-toolbar">
-        <div className="ask-toolbar-left">
-          <div ref={buttonRef} className="auth-google-btn" />
-        </div>
-        <span className="ask-toolbar-hint">{hint}</span>
+      <p className="auth-eyebrow">Required to open the archive desk</p>
+      <h2 className="auth-headline">Sign in to ask the paper</h2>
+      <p className="auth-deck">
+        The lead headline unlocks after Google sign-in. Answers stay grounded in
+        cited archive sources.
+      </p>
+
+      <div className="auth-cta">
+        <div ref={buttonRef} className="auth-google-btn" />
+        <p className="auth-cta-note">
+          {busy ? 'Signing in…' : ready ? 'One step · then Ask' : 'Loading sign-in…'}
+        </p>
       </div>
+
       {localError ? (
         <p className="auth-error" role="alert">
           {localError}
