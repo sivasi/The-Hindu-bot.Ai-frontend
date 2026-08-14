@@ -8,14 +8,6 @@ type GoogleCredentialResponse = {
   select_by?: string
 }
 
-type PromptMomentNotification = {
-  isNotDisplayed: () => boolean
-  isSkippedMoment: () => boolean
-  isDismissedMoment: () => boolean
-  getNotDisplayedReason?: () => string
-  getSkippedReason?: () => string
-}
-
 type GoogleAccountsId = {
   initialize: (config: {
     client_id: string
@@ -23,7 +15,6 @@ type GoogleAccountsId = {
     auto_select?: boolean
     cancel_on_tap_outside?: boolean
     context?: string
-    use_fedcm_for_prompt?: boolean
   }) => void
   renderButton: (
     parent: HTMLElement,
@@ -37,8 +28,6 @@ type GoogleAccountsId = {
       width?: number
     },
   ) => void
-  prompt: (momentListener?: (notification: PromptMomentNotification) => void) => void
-  cancel?: () => void
 }
 
 declare global {
@@ -84,11 +73,9 @@ type GoogleSignInProps = {
 
 export function GoogleSignIn({ onSignedIn, onError }: GoogleSignInProps) {
   const buttonRef = useRef<HTMLDivElement>(null)
-  const googleIdRef = useRef<GoogleAccountsId | null>(null)
   const [ready, setReady] = useState(false)
   const [busy, setBusy] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
-  const [showFallback, setShowFallback] = useState(false)
   const onSignedInRef = useRef(onSignedIn)
   const onErrorRef = useRef(onError)
 
@@ -113,7 +100,6 @@ export function GoogleSignIn({ onSignedIn, onError }: GoogleSignInProps) {
         if (!googleId) {
           throw new Error('Google Identity Services unavailable.')
         }
-        googleIdRef.current = googleId
 
         googleId.initialize({
           client_id: clientId,
@@ -178,21 +164,6 @@ export function GoogleSignIn({ onSignedIn, onError }: GoogleSignInProps) {
     }
   }, [])
 
-  function handleSignInClick() {
-    if (!ready || busy) return
-    setLocalError(null)
-    const googleId = googleIdRef.current
-    if (!googleId) {
-      setShowFallback(true)
-      return
-    }
-    googleId.prompt((notification) => {
-      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-        setShowFallback(true)
-      }
-    })
-  }
-
   return (
     <section className="auth-lead animate-fade-up" aria-busy={busy || !ready}>
       <p className="auth-eyebrow">Archive edition</p>
@@ -201,20 +172,12 @@ export function GoogleSignIn({ onSignedIn, onError }: GoogleSignInProps) {
         Open the desk with Google — then type your question where the lead headline sits.
       </p>
 
-      <button
-        type="button"
-        className="auth-signin-btn"
-        onClick={handleSignInClick}
-        disabled={!ready || busy}
-      >
-        {busy ? 'Signing in…' : ready ? 'Sign in with Google' : 'Loading…'}
-      </button>
-
-      <div
-        ref={buttonRef}
-        className={`auth-google-fallback${showFallback ? ' auth-google-fallback-visible' : ''}`}
-        aria-hidden={!showFallback}
-      />
+      <div className={`auth-signin-wrap${!ready || busy ? ' auth-signin-wrap-busy' : ''}`}>
+        <span className="auth-signin-btn" aria-hidden>
+          {busy ? 'Signing in…' : ready ? 'Sign in with Google' : 'Loading…'}
+        </span>
+        <div ref={buttonRef} className="auth-signin-gis" />
+      </div>
 
       {localError ? (
         <p className="auth-error" role="alert">

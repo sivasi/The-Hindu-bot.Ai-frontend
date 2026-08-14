@@ -641,7 +641,7 @@ export default function App() {
               <p className="masthead-link">Cited sources</p>
               <p className="masthead-link">One front page</p>
             </div>
-            <p className="masthead-vol">Vol. Q&amp;A · No. 1</p>
+            <p className="masthead-vol">Vol. Q&amp;A · Version 2.0</p>
           </div>
         </header>
 
@@ -838,7 +838,7 @@ export default function App() {
 
         <footer className="site-footer">
           <div className="site-footer-left">
-            <p className="site-footer-brand">The Hindu Bot.AI</p>
+            <p className="site-footer-brand">The Hindu Bot.AI · 2.0</p>
             {signedIn ? (
               <a
                 className="site-footer-pdf"

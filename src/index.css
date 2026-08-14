@@ -200,12 +200,27 @@
   color: var(--ink-muted);
 }
 
-.auth-signin-btn {
-  appearance: none;
+.auth-signin-wrap {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin: 0;
+  min-width: 14.5rem;
+  min-height: 2.65rem;
+  overflow: hidden;
+}
+
+.auth-signin-wrap-busy {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.auth-signin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 2.65rem;
   padding: 0.72rem 1.35rem;
   border: 2px solid var(--hindu-red);
   background: #fff;
@@ -215,38 +230,35 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  cursor: pointer;
   line-height: 1.2;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--hindu-red) 16%, transparent);
-  transition:
-    background 0.15s ease,
-    color 0.15s ease,
-    box-shadow 0.15s ease;
+  pointer-events: none;
+  user-select: none;
 }
 
-.auth-signin-btn:hover:not(:disabled) {
+.auth-signin-wrap:hover .auth-signin-btn {
   background: var(--hindu-red);
   color: #fff;
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--hindu-red) 24%, transparent);
 }
 
-.auth-signin-btn:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 3px;
+.auth-signin-gis {
+  position: absolute;
+  inset: 0;
+  opacity: 0.011;
+  overflow: hidden;
+  cursor: pointer;
 }
 
-.auth-signin-btn:disabled {
-  opacity: 0.55;
-  cursor: wait;
+.auth-signin-gis > div,
+.auth-signin-gis iframe {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
 }
 
 .auth-google-fallback {
   display: none;
-  margin-top: 0.85rem;
-}
-
-.auth-google-fallback-visible {
-  display: block;
 }
 
 .auth-error {
@@ -446,6 +458,12 @@
 
 .chat-session-active .inside-head {
   color: var(--hindu-red);
+}
+
+.chat-session-main .inside-snip {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: clip;
 }
 
 .chat-session-main:disabled {

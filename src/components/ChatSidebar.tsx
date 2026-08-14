@@ -7,6 +7,12 @@ export type InsideSuggestion = {
   q: string
 }
 
+function truncatePlain(text: string, max = 72): string {
+  const cleaned = text.replace(/\s+/g, ' ').trim()
+  if (cleaned.length <= max) return cleaned
+  return cleaned.slice(0, max).trimEnd()
+}
+
 type ChatSidebarProps = {
   sessions: ChatSession[]
   activeId: string | null
@@ -77,10 +83,11 @@ export function ChatSidebar({
           <ul className="chat-session-list">
             {sessions.map((session) => {
               const active = session.id === activeId
-              const snip =
+              const snip = truncatePlain(
                 session.preview?.trim() ||
-                relativeTime(session.lastMessageAt || session.createdAt) ||
-                'Open this chat'
+                  relativeTime(session.lastMessageAt || session.createdAt) ||
+                  'Open this chat',
+              )
               return (
                 <li
                   key={session.id}
