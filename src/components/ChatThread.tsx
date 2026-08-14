@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { MarkdownAnswer } from './MarkdownAnswer'
 import { SourceItem } from './SourceItem'
 import type { ChatMessage } from '../types'
@@ -8,11 +9,32 @@ type ChatThreadProps = {
   onToggleSources: () => void
 }
 
+function useIsMobile(maxWidth = 900) {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined'
+      ? window.matchMedia(`(max-width: ${maxWidth}px)`).matches
+      : false,
+  )
+
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${maxWidth}px)`)
+    const update = () => setIsMobile(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [maxWidth])
+
+  return isMobile
+}
+
 export function ChatThread({
   messages,
   showAllSources,
   onToggleSources,
 }: ChatThreadProps) {
+  const isMobile = useIsMobile()
+  const previewCount = isMobile ? 2 : 3
+
   if (!messages.length) return null
 
   return (
@@ -33,6 +55,11 @@ export function ChatThread({
           index === messages.length - 1 ||
           !messages.slice(index + 1).some((m) => m.role === 'assistant')
 
+        const visibleSources =
+          isLastAssistant && !showAllSources
+            ? sources.slice(0, previewCount)
+            : sources
+
         return (
           <article key={msg.id} className="chat-turn chat-turn-assistant">
             <p className="chat-turn-label">Answer</p>
@@ -49,21 +76,19 @@ export function ChatThread({
               <p className="italic text-[var(--ink-muted)]">No answer was returned.</p>
             )}
             {sources.length > 0 ? (
-              <div className="chat-turn-sources">
+              <div className={`chat-turn-sources${isMobile ? ' chat-turn-sources-mobile' : ''}`}>
                 <h3 className="chat-turn-sources-title">Sources</h3>
                 <ul className="source-list">
-                  {(isLastAssistant && !showAllSources
-                    ? sources.slice(0, 3)
-                    : sources
-                  ).map((source, i) => (
+                  {visibleSources.map((source, i) => (
                     <SourceItem
                       key={`${msg.id}-${source.heading}-${source.chunkIndex}-${source.pageNumber}-${i}`}
                       source={source}
                       index={i}
+                      compact={isMobile}
                     />
                   ))}
                 </ul>
-                {isLastAssistant && sources.length > 3 ? (
+                {isLastAssistant && sources.length > previewCount ? (
                   <button
                     type="button"
                     className="sources-more"
@@ -71,8 +96,8 @@ export function ChatThread({
                     aria-expanded={showAllSources}
                   >
                     {showAllSources
-                      ? 'Show fewer sources'
-                      : `Show ${sources.length - 3} more sources`}
+                      ? 'Show fewer'
+                      : `+${sources.length - previewCount} more`}
                   </button>
                 ) : null}
               </div>
