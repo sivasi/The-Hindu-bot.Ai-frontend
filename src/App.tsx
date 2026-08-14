@@ -10,12 +10,18 @@ import {
   logout,
 } from './auth'
 import type { AuthUser } from './authTypes'
+import {
+  deleteChat,
+  getChat,
+  listChats,
+  renameChat,
+} from './chats'
+import { ChatSidebar } from './components/ChatSidebar'
+import { ChatThread } from './components/ChatThread'
 import { GoogleSignIn } from './components/GoogleSignIn'
 import { JourneyStatus } from './components/JourneyStatus'
-import { MarkdownAnswer } from './components/MarkdownAnswer'
-import { SourceItem } from './components/SourceItem'
 import { StreamingAnswer } from './components/StreamingAnswer'
-import type { QueryMode, QueryResponse } from './types'
+import type { ChatMessage, ChatSession, QueryMode, QueryResponse } from './types'
 
 type TurboKind = 'short' | 'research'
 
@@ -28,6 +34,15 @@ function modeHint(mode: QueryMode): string {
   if (mode === 'turbo_short') return 'Deeper · more accurate · ~30–50 words'
   if (mode === 'turbo_research') return 'Deeper · more accurate · up to ~300 words'
   return 'Concise · 3 sources'
+}
+
+function upsertSession(list: ChatSession[], session: ChatSession): ChatSession[] {
+  const without = list.filter((s) => s.id !== session.id)
+  return [session, ...without].sort((a, b) => {
+    const ta = new Date(a.lastMessageAt || a.createdAt || 0).getTime()
+    const tb = new Date(b.lastMessageAt || b.createdAt || 0).getTime()
+    return tb - ta
+  })
 }
 
 const CITIES = [
@@ -68,10 +83,10 @@ const FEATURES = [
     blurb: 'The desk pulls the closest passages before drafting a reply.',
   },
   {
-    kicker: 'Way forward',
+    kicker: 'History',
     tone: 'red',
-    title: 'One front page. One question.',
-    blurb: 'No chat history screen — type above the fold and read below.',
+    title: 'Chats stay in the Inside column',
+    blurb: 'Each thread is a session — open, rename, or start a new lead.',
   },
   {
     kicker: 'How to use',
@@ -121,6 +136,10 @@ export default function App() {
   const [isStreamingAnswer, setIsStreamingAnswer] = useState(false)
   const [authStatus, setAuthStatus] = useState<AuthStatus>('checking')
   const [user, setUser] = useState<AuthUser | null>(null)
+  const [sessions, setSessions] = useState<ChatSession[]>([])
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [chatsLoading, setChatsLoading] = useState(false)
   const answerRef = useRef<HTMLElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const streamDraftRef = useRef('')
@@ -168,6 +187,22 @@ export default function App() {
     }
   }, [])
 
+  async function refreshChats() {
+    setChatsLoading(true)
+    try {
+      const list = await listChats()
+      setSessions(list)
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        handleSessionExpired(err.message)
+        return
+      }
+      // Chats API may be briefly unavailable — keep Ask usable.
+    } finally {
+      setChatsLoading(false)
+    }
+  }
+
   useEffect(() => {
     let cancelled = false
 
@@ -191,7 +226,6 @@ export default function App() {
         }
       } catch {
         if (cancelled) return
-        // Token present but /me unavailable — keep session for Ask until a 401.
         setUser({ name: 'Signed-in reader' })
         setAuthStatus('signed_in')
       }
@@ -204,6 +238,16 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    if (!signedIn) {
+      setSessions([])
+      setActiveSessionId(null)
+      setMessages([])
+      return
+    }
+    void refreshChats()
+  }, [signedIn])
+
+  useEffect(() => {
     return () => {
       abortRef.current?.abort()
       if (tokenFlushRaf.current != null) {
@@ -211,6 +255,18 @@ export default function App() {
       }
     }
   }, [])
+
+  function resetThreadUi() {
+    setQuestion('')
+    setResult(null)
+    setError(null)
+    setStatus('idle')
+    setJourneyMessage(null)
+    setStreamDraft('')
+    streamDraftRef.current = ''
+    setIsStreamingAnswer(false)
+    setShowAllSources(false)
+  }
 
   function handleSignedIn(nextUser: AuthUser) {
     setUser(nextUser)
@@ -223,28 +279,97 @@ export default function App() {
     await logout()
     setUser(null)
     setAuthStatus('signed_out')
-    setQuestion('')
-    setResult(null)
-    setError(null)
-    setStatus('idle')
-    setJourneyMessage(null)
-    setStreamDraft('')
-    streamDraftRef.current = ''
-    setIsStreamingAnswer(false)
-    setShowAllSources(false)
+    setSessions([])
+    setActiveSessionId(null)
+    setMessages([])
+    resetThreadUi()
   }
 
   function handleSessionExpired(message?: string) {
     clearToken()
     setUser(null)
     setAuthStatus('signed_out')
-    setResult(null)
+    setSessions([])
+    setActiveSessionId(null)
+    setMessages([])
+    resetThreadUi()
+    setError(message || 'Session expired. Please sign in again.')
+  }
+
+  function handleNewChat() {
+    abortRef.current?.abort()
+    setActiveSessionId(null)
+    setMessages([])
+    resetThreadUi()
+  }
+
+  async function handleSelectChat(id: string) {
+    if (status === 'loading') return
+    abortRef.current?.abort()
+    setError(null)
+    setShowAllSources(false)
     setJourneyMessage(null)
-    setIsStreamingAnswer(false)
     setStreamDraft('')
     streamDraftRef.current = ''
-    setStatus('idle')
-    setError(message || 'Session expired. Please sign in again.')
+    setIsStreamingAnswer(false)
+    setQuestion('')
+    try {
+      const { session, messages: loaded } = await getChat(id)
+      setActiveSessionId(session.id)
+      setMessages(loaded)
+      setSessions((prev) => upsertSession(prev, session))
+      const lastAssistant = [...loaded].reverse().find((m) => m.role === 'assistant')
+      if (lastAssistant) {
+        setResult({
+          answer: lastAssistant.content,
+          sources: lastAssistant.sources ?? [],
+          meta: lastAssistant.meta ?? {
+            k: 0,
+            model: '',
+            collection: '',
+          },
+        })
+        setStatus('done')
+      } else {
+        setResult(null)
+        setStatus('idle')
+      }
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        handleSessionExpired(err.message)
+        return
+      }
+      setError(err instanceof ApiError ? err.message : 'Could not open that chat.')
+    }
+  }
+
+  async function handleRenameChat(id: string, title: string) {
+    try {
+      const session = await renameChat(id, title)
+      setSessions((prev) => upsertSession(prev, session))
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        handleSessionExpired(err.message)
+        return
+      }
+      setError(err instanceof ApiError ? err.message : 'Could not rename chat.')
+    }
+  }
+
+  async function handleDeleteChat(id: string) {
+    try {
+      await deleteChat(id)
+      setSessions((prev) => prev.filter((s) => s.id !== id))
+      if (activeSessionId === id) {
+        handleNewChat()
+      }
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        handleSessionExpired(err.message)
+        return
+      }
+      setError(err instanceof ApiError ? err.message : 'Could not delete chat.')
+    }
   }
 
   function flushStreamDraft() {
@@ -254,6 +379,7 @@ export default function App() {
       setStreamDraft(streamDraftRef.current)
     })
   }
+
   async function handleAsk(e?: FormEvent) {
     e?.preventDefault()
     const trimmed = question.trim()
@@ -263,6 +389,16 @@ export default function App() {
     const controller = new AbortController()
     abortRef.current = controller
 
+    const sessionIdForRequest = activeSessionId
+    const userMessage: ChatMessage = {
+      id: `local-user-${Date.now()}`,
+      role: 'user',
+      content: trimmed,
+      createdAt: new Date().toISOString(),
+    }
+
+    setMessages((prev) => [...prev, userMessage])
+    setQuestion('')
     setStatus('loading')
     setError(null)
     setResult(null)
@@ -276,7 +412,11 @@ export default function App() {
         : 'Searching deeply about the content',
     )
 
-    const request = { question: trimmed, mode }
+    const request = {
+      question: trimmed,
+      mode,
+      sessionId: sessionIdForRequest,
+    }
 
     try {
       await queryArchiveStream(request, {
@@ -302,6 +442,14 @@ export default function App() {
             })
           }
         },
+        onSession: (event) => {
+          const session = {
+            ...event.session,
+            id: event.sessionId || event.session.id,
+          }
+          setActiveSessionId(session.id)
+          setSessions((prev) => upsertSession(prev, session))
+        },
         onResult: (data) => {
           if (tokenFlushRaf.current != null) {
             cancelAnimationFrame(tokenFlushRaf.current)
@@ -311,6 +459,15 @@ export default function App() {
           setIsStreamingAnswer(false)
           setStreamDraft('')
           streamDraftRef.current = ''
+          const assistantMessage: ChatMessage = {
+            id: `local-asst-${Date.now()}`,
+            role: 'assistant',
+            content: data.answer,
+            sources: data.sources,
+            meta: data.meta,
+            createdAt: new Date().toISOString(),
+          }
+          setMessages((prev) => [...prev, assistantMessage])
           setResult(data)
           setStatus('done')
           requestAnimationFrame(() => {
@@ -338,7 +495,6 @@ export default function App() {
         return
       }
 
-      // Fallback to blocking /api/query if stream is unavailable
       try {
         setJourneyMessage(
           mode === 'normal'
@@ -350,8 +506,18 @@ export default function App() {
         setIsStreamingAnswer(false)
         setStreamDraft('')
         streamDraftRef.current = ''
+        const assistantMessage: ChatMessage = {
+          id: `local-asst-${Date.now()}`,
+          role: 'assistant',
+          content: data.answer,
+          sources: data.sources,
+          meta: data.meta,
+          createdAt: new Date().toISOString(),
+        }
+        setMessages((prev) => [...prev, assistantMessage])
         setResult(data)
         setStatus('done')
+        void refreshChats()
         requestAnimationFrame(() => {
           answerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
         })
@@ -389,9 +555,7 @@ export default function App() {
   const canAsk = signedIn && question.trim().length > 0 && status !== 'loading'
   const userLabel = displayName(user)
   const userAvatar = avatarUrl(user)
-  const resultMode =
-    result?.meta?.mode ??
-    (result?.meta?.turbo ? 'turbo_research' : result ? 'normal' : null)
+  const chatBusy = status === 'loading'
 
   return (
     <div className="app-shell">
@@ -486,30 +650,43 @@ export default function App() {
           ))}
         </section>
 
-        <div className="page-grid">
-          <aside className="inside-col" aria-label="Inside">
-            <h2 className="inside-title">Inside</h2>
-            {INSIDE.map((item) => (
-              <button
-                key={item.head}
-                type="button"
-                className="inside-item"
-                onClick={() => applySuggestion(item.q)}
-                disabled={!signedIn || status === 'loading'}
-              >
-                <p className="inside-head">{item.head}</p>
-                <p className="inside-snip">{item.snip}</p>
-              </button>
-            ))}
-          </aside>
+        <div className={`page-grid${signedIn ? ' page-grid-chats' : ''}`}>
+          {signedIn ? (
+            <ChatSidebar
+              sessions={sessions}
+              activeId={activeSessionId}
+              loading={chatsLoading}
+              busy={chatBusy}
+              onNewChat={handleNewChat}
+              onSelect={(id) => void handleSelectChat(id)}
+              onRename={(id, title) => handleRenameChat(id, title)}
+              onDelete={(id) => handleDeleteChat(id)}
+            />
+          ) : (
+            <aside className="inside-col" aria-label="Inside">
+              <h2 className="inside-title">Inside</h2>
+              {INSIDE.map((item) => (
+                <button
+                  key={item.head}
+                  type="button"
+                  className="inside-item"
+                  onClick={() => applySuggestion(item.q)}
+                  disabled
+                >
+                  <p className="inside-head">{item.head}</p>
+                  <p className="inside-snip">{item.snip}</p>
+                </button>
+              ))}
+            </aside>
+          )}
 
           <main className="lead-col">
             {signedIn && (
               <div className="lead-headline-block">
                 <p className="ask-deck">
-                  A living front page for the archive: put your question where the lead
-                  headline usually sits, and the desk answers from retrieved newspaper
-                  chunks — with sources printed underneath.
+                  {activeSessionId
+                    ? 'Continue this thread in the lead — answers stay grounded in archive sources.'
+                    : 'A living front page for the archive: put your question where the lead headline usually sits. A new chat is created on your first Ask.'}
                 </p>
               </div>
             )}
@@ -607,7 +784,7 @@ export default function App() {
               </div>
             )}
 
-            {(!signedIn || (status !== 'done' && status !== 'loading')) && (
+            {!signedIn && (
               <section className="about-block" aria-labelledby="about-heading">
                 <h2 id="about-heading" className="sr-only">
                   About this website
@@ -618,53 +795,57 @@ export default function App() {
                   answers with citations from indexed article chunks.
                 </p>
 
-                {!signedIn && (
-                  <div className="about-how">
-                    <h3 className="about-subhead">How the desk works</h3>
-                    <ol className="about-steps">
-                      <li>
-                        <span className="about-step-num">1</span>
-                        <div>
-                          <p className="about-step-title">Sign in</p>
-                          <p className="about-step-body">
-                            Open the edition with Google. No chat history — one front
-                            page, one question at a time.
-                          </p>
-                        </div>
-                      </li>
-                      <li>
-                        <span className="about-step-num">2</span>
-                        <div>
-                          <p className="about-step-title">Ask the lead</p>
-                          <p className="about-step-body">
-                            Put your question in the headline slot. Use Inside briefs
-                            if you want a ready-made prompt.
-                          </p>
-                        </div>
-                      </li>
-                      <li>
-                        <span className="about-step-num">3</span>
-                        <div>
-                          <p className="about-step-title">Read with citations</p>
-                          <p className="about-step-body">
-                            Follow the journey line, then the answer and sources —
-                            jump to the PDF page when you need the full clip.
-                          </p>
-                        </div>
-                      </li>
-                    </ol>
-                  </div>
-                )}
+                <div className="about-how">
+                  <h3 className="about-subhead">How the desk works</h3>
+                  <ol className="about-steps">
+                    <li>
+                      <span className="about-step-num">1</span>
+                      <div>
+                        <p className="about-step-title">Sign in</p>
+                        <p className="about-step-body">
+                          Open the edition with Google. Your chats appear in the
+                          Inside column.
+                        </p>
+                      </div>
+                    </li>
+                    <li>
+                      <span className="about-step-num">2</span>
+                      <div>
+                        <p className="about-step-title">Ask the lead</p>
+                        <p className="about-step-body">
+                          Put your question in the headline slot. Start a new chat
+                          anytime from the sidebar.
+                        </p>
+                      </div>
+                    </li>
+                    <li>
+                      <span className="about-step-num">3</span>
+                      <div>
+                        <p className="about-step-title">Read with citations</p>
+                        <p className="about-step-body">
+                          Follow the journey line, then the answer and sources —
+                          jump to the PDF page when you need the full clip.
+                        </p>
+                      </div>
+                    </li>
+                  </ol>
+                </div>
+              </section>
+            )}
+
+            {signedIn && messages.length > 0 && (
+              <section ref={answerRef} className="section-rule scroll-mt-6">
+                <ChatThread
+                  messages={messages}
+                  showAllSources={showAllSources}
+                  onToggleSources={() => setShowAllSources((v) => !v)}
+                />
               </section>
             )}
 
             {signedIn && status === 'loading' && isStreamingAnswer && (
-              <section
-                ref={answerRef}
-                className="section-rule scroll-mt-6"
-                aria-labelledby="answer-heading"
-              >
-                <h2 id="answer-heading" className="section-label">
+              <section className="section-rule scroll-mt-6" aria-labelledby="stream-heading">
+                <h2 id="stream-heading" className="section-label">
                   Answer
                 </h2>
                 <p className="answer-mode-note">Turbo Research · streaming</p>
@@ -679,74 +860,13 @@ export default function App() {
               </section>
             )}
 
-            {signedIn && status === 'done' && result && (
-              <>
-                <section
-                  ref={answerRef}
-                  className="section-rule animate-fade-up scroll-mt-6"
-                  aria-labelledby="answer-heading"
-                >
-                  <h2 id="answer-heading" className="section-label">
-                    Answer
-                  </h2>
-                  {resultMode && resultMode !== 'normal' ? (
-                    <p className="answer-mode-note">
-                      {resultMode === 'turbo_short'
-                        ? 'Turbo Short · deeper · more accurate · brief'
-                        : 'Turbo Research · deeper · more accurate · longer'}
-                    </p>
-                  ) : null}
-                  {result.answer?.trim() ? (
-                    <MarkdownAnswer content={result.answer} />
-                  ) : (
-                    <p className="italic text-[var(--ink-muted)]">
-                      No answer was returned for this question.
-                    </p>
-                  )}
-                </section>
-
-                <section
-                  className="section-rule animate-fade-up"
-                  style={{ animationDelay: '80ms' }}
-                  aria-labelledby="sources-heading"
-                >
-                  <h2 id="sources-heading" className="section-label">
-                    Sources
-                  </h2>
-                  {result.sources?.length ? (
-                    <>
-                      <ul className="source-list">
-                        {(showAllSources
-                          ? result.sources
-                          : result.sources.slice(0, 3)
-                        ).map((source, i) => (
-                          <SourceItem
-                            key={`${source.heading}-${source.chunkIndex}-${source.pageNumber}-${i}`}
-                            source={source}
-                            index={i}
-                          />
-                        ))}
-                      </ul>
-                      {result.sources.length > 3 && (
-                        <button
-                          type="button"
-                          className="sources-more"
-                          onClick={() => setShowAllSources((v) => !v)}
-                          aria-expanded={showAllSources}
-                        >
-                          {showAllSources
-                            ? 'Show fewer sources'
-                            : `Show ${result.sources.length - 3} more sources`}
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <p className="italic text-[var(--ink-muted)]">
-                      No sources were retrieved for this answer.
-                    </p>
-                  )}
-                </section>
-              </>
+            {signedIn && status === 'idle' && messages.length === 0 && !result && (
+              <section className="about-block">
+                <p className="about-lead">
+                  Start a new lead above, or open a previous chat from the Inside
+                  column. Each Ask is saved to the active thread.
+                </p>
+              </section>
             )}
           </main>
         </div>

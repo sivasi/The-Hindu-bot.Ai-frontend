@@ -302,6 +302,235 @@
   cursor: not-allowed;
 }
 
+/* Chat history in the Inside column */
+.chat-sidebar-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-bottom: 0.35rem;
+}
+
+.chat-sidebar .inside-title {
+  margin-bottom: 0;
+  padding-bottom: 0.35rem;
+}
+
+.chat-new-btn {
+  appearance: none;
+  align-self: stretch;
+  margin: 0;
+  padding: 0.45rem 0.55rem;
+  border: 1.5px solid var(--hindu-red);
+  background: #fff;
+  color: var(--hindu-red);
+  font-family: var(--sans);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.chat-new-btn:hover:not(:disabled) {
+  background: var(--hindu-red);
+  color: #fff;
+}
+
+.chat-new-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chat-sidebar-empty {
+  margin: 0.75rem 0 0;
+  font-family: var(--serif);
+  font-size: 0.82rem;
+  font-style: italic;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+.chat-session-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.chat-session-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.15rem;
+  align-items: start;
+  border-bottom: 1px solid var(--rule-light);
+  padding: 0.55rem 0;
+}
+
+.chat-session-item:last-child {
+  border-bottom: none;
+}
+
+.chat-session-active {
+  background: color-mix(in srgb, var(--hindu-red) 6%, transparent);
+  margin: 0 -0.35rem;
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
+}
+
+.chat-session-main {
+  appearance: none;
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.chat-session-main:disabled {
+  cursor: wait;
+}
+
+.chat-session-title {
+  margin: 0 0 0.2rem;
+  font-family: var(--serif);
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--ink);
+}
+
+.chat-session-active .chat-session-title {
+  color: var(--hindu-red);
+}
+
+.chat-session-preview {
+  margin: 0 0 0.2rem;
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--ink-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.chat-session-time {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.chat-session-menu-wrap {
+  position: relative;
+}
+
+.chat-session-menu-btn {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0.1rem 0.25rem;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.chat-session-menu {
+  position: absolute;
+  right: 0;
+  top: 1.2rem;
+  z-index: 5;
+  min-width: 7.5rem;
+  border: 1px solid var(--rule);
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.chat-session-menu button {
+  appearance: none;
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0.45rem 0.65rem;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-family: var(--sans);
+  font-size: 0.75rem;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.chat-session-menu button:hover {
+  background: var(--panel-offwhite);
+}
+
+.chat-session-menu-danger {
+  color: var(--danger) !important;
+}
+
+.chat-rename-form {
+  grid-column: 1 / -1;
+}
+
+.chat-rename-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--rule);
+  padding: 0.35rem 0.45rem;
+  font-family: var(--serif);
+  font-size: 0.85rem;
+}
+
+.chat-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 1.35rem;
+}
+
+.chat-turn-label {
+  margin: 0 0 0.45rem;
+  font-family: var(--sans);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--hindu-red);
+}
+
+.chat-turn-user-text {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: clamp(1.15rem, 2.4vw, 1.55rem);
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.chat-turn-assistant {
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--rule-light);
+}
+
+.chat-turn-sources {
+  margin-top: 1rem;
+}
+
+.chat-turn-sources-title {
+  margin: 0 0 0.65rem;
+  font-family: var(--serif);
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
 .masthead-logo {
   display: flex;
   justify-content: center;
@@ -448,6 +677,10 @@
   gap: 0;
   border-bottom: 1px solid var(--rule);
   padding-top: 0.35rem;
+}
+
+.page-grid-chats {
+  grid-template-columns: 220px 1fr;
 }
 
 .inside-col {

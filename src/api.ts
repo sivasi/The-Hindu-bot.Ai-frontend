@@ -3,6 +3,7 @@ import type {
   QueryRequest,
   QueryResponse,
   StreamEvent,
+  StreamSessionEvent,
   StreamStatusEvent,
 } from './types'
 import { authHeaders, clearToken, getToken } from './token'
@@ -59,6 +60,9 @@ function buildQueryBody(body: QueryRequest) {
   ) {
     payload.k = body.k
   }
+  if (body.sessionId) {
+    payload.sessionId = body.sessionId
+  }
   return payload
 }
 
@@ -90,6 +94,7 @@ export type StreamHandlers = {
   onStatus: (event: StreamStatusEvent) => void
   onToken?: (text: string) => void
   onResult: (result: QueryResponse) => void
+  onSession?: (event: StreamSessionEvent) => void
   onError: (message: string) => void
   signal?: AbortSignal
 }
@@ -161,6 +166,8 @@ export async function queryArchiveStream(
         sources: event.sources ?? [],
         meta: event.meta,
       })
+    } else if (event.type === 'session') {
+      handlers.onSession?.(event)
     } else if (event.type === 'error') {
       streamError = event.message || 'Query failed'
       handlers.onError(streamError)

@@ -37,6 +37,26 @@ export type QueryRequest = {
   question: string
   mode?: QueryMode
   k?: number
+  sessionId?: string | null
+}
+
+export type ChatSession = {
+  id: string
+  title: string
+  preview?: string
+  messageCount?: number
+  lastMessageAt?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export type ChatMessage = {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  sources?: Source[]
+  meta?: QueryResponse['meta']
+  createdAt?: string
 }
 
 export type StreamStep = 'searching' | 'found' | 'llm' | 'answering' | string
@@ -60,6 +80,13 @@ export type StreamResultEvent = {
   meta: QueryResponse['meta']
 }
 
+export type StreamSessionEvent = {
+  type: 'session'
+  sessionId: string
+  session: ChatSession
+  created?: boolean
+}
+
 export type StreamErrorEvent = {
   type: 'error'
   message: string
@@ -73,5 +100,6 @@ export type StreamEvent =
   | StreamStatusEvent
   | StreamTokenEvent
   | StreamResultEvent
+  | StreamSessionEvent
   | StreamErrorEvent
   | StreamDoneEvent
