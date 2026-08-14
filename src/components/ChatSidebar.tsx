@@ -109,10 +109,14 @@ export function ChatSidebar({
             {sessions.map((session) => {
               const active = session.id === activeId
               const renaming = renamingId === session.id
+              const snip =
+                session.preview?.trim() ||
+                relativeTime(session.lastMessageAt || session.createdAt) ||
+                'Open this chat'
               return (
                 <li
                   key={session.id}
-                  className={`chat-session-item${active ? ' chat-session-active' : ''}`}
+                  className={`chat-session-item${active ? ' chat-session-active' : ''}${menuId === session.id ? ' chat-session-menu-open' : ''}`}
                 >
                   {renaming ? (
                     <form
@@ -135,19 +139,12 @@ export function ChatSidebar({
                     <>
                       <button
                         type="button"
-                        className="chat-session-main"
+                        className="inside-item chat-session-main"
                         onClick={() => onSelect(session.id)}
                         disabled={busy}
                       >
-                        <p className="chat-session-title">
-                          {session.title || 'New chat'}
-                        </p>
-                        {session.preview ? (
-                          <p className="chat-session-preview">{session.preview}</p>
-                        ) : null}
-                        <p className="chat-session-time">
-                          {relativeTime(session.lastMessageAt || session.createdAt)}
-                        </p>
+                        <p className="inside-head">{session.title || 'New chat'}</p>
+                        <p className="inside-snip">{snip}</p>
                       </button>
                       <div
                         className="chat-session-menu-wrap"
