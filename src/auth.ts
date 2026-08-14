@@ -51,9 +51,8 @@ export async function resolveGoogleClientId(): Promise<string> {
   if (fromApi) return fromApi
   const fromEnv = String(import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '').trim()
   if (fromEnv) return fromEnv
-  throw new ApiError(
-    'Google Sign-In is not configured. Set VITE_GOOGLE_CLIENT_ID or expose /api/auth/config.',
-  )
+  // Public Web client ID (safe in frontend). Never ship client_secret here.
+  return '890206062914-lqjg6fo4takkvbidg04n2vuem456tqhs.apps.googleusercontent.com'
 }
 
 export async function exchangeGoogleIdToken(
