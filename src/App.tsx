@@ -11,10 +11,8 @@ import {
 } from './auth'
 import type { AuthUser } from './authTypes'
 import {
-  deleteChat,
   getChat,
   listChats,
-  renameChat,
 } from './chats'
 import { ChatSidebar } from './components/ChatSidebar'
 import { ChatThread } from './components/ChatThread'
@@ -340,35 +338,6 @@ export default function App() {
         return
       }
       setError(err instanceof ApiError ? err.message : 'Could not open that chat.')
-    }
-  }
-
-  async function handleRenameChat(id: string, title: string) {
-    try {
-      const session = await renameChat(id, title)
-      setSessions((prev) => upsertSession(prev, session))
-    } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-        handleSessionExpired(err.message)
-        return
-      }
-      setError(err instanceof ApiError ? err.message : 'Could not rename chat.')
-    }
-  }
-
-  async function handleDeleteChat(id: string) {
-    try {
-      await deleteChat(id)
-      setSessions((prev) => prev.filter((s) => s.id !== id))
-      if (activeSessionId === id) {
-        handleNewChat()
-      }
-    } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-        handleSessionExpired(err.message)
-        return
-      }
-      setError(err instanceof ApiError ? err.message : 'Could not delete chat.')
     }
   }
 
@@ -720,8 +689,6 @@ export default function App() {
               suggestions={INSIDE}
               onNewChat={handleNewChat}
               onSelect={(id) => void handleSelectChat(id)}
-              onRename={(id, title) => handleRenameChat(id, title)}
-              onDelete={(id) => handleDeleteChat(id)}
               onLogout={() => void handleLogout()}
               onSuggest={applySuggestion}
             />
