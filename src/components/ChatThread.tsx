@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { MarkdownAnswer } from './MarkdownAnswer'
 import { SourceItem } from './SourceItem'
 import type { ChatMessage } from '../types'
@@ -7,6 +7,8 @@ type ChatThreadProps = {
   messages: ChatMessage[]
   showAllSources: boolean
   onToggleSources: () => void
+  /** Keep the latest unanswered question visible while a reply is in flight. */
+  showPendingQuestion?: boolean
 }
 
 function useIsMobile(maxWidth = 900) {
@@ -27,19 +29,73 @@ function useIsMobile(maxWidth = 900) {
   return isMobile
 }
 
+function isCompleteAssistant(msg: ChatMessage): boolean {
+  return Boolean(msg.content?.trim()) && (msg.sources?.length ?? 0) > 0
+}
+
+/** Drop failed turns: questions with no usable answer/sources. */
+export function pruneIncompleteTurns(messages: ChatMessage[]): ChatMessage[] {
+  return visibleMessages(messages, false)
+}
+
+function visibleMessages(
+  messages: ChatMessage[],
+  showPendingQuestion: boolean,
+): ChatMessage[] {
+  const out: ChatMessage[] = []
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i]
+
+    if (msg.role === 'user') {
+      const next = messages[i + 1]
+      if (next?.role === 'assistant' && isCompleteAssistant(next)) {
+        out.push(msg)
+        continue
+      }
+      const isLast = i === messages.length - 1
+      const awaitingReply = !next || next.role !== 'assistant'
+      if (showPendingQuestion && isLast && awaitingReply) {
+        out.push(msg)
+      }
+      continue
+    }
+
+    if (isCompleteAssistant(msg)) {
+      out.push(msg)
+    }
+  }
+
+  return out
+}
+
 export function ChatThread({
   messages,
   showAllSources,
-  onToggleSources,
+  showPendingQuestion = false,
 }: ChatThreadProps) {
   const isMobile = useIsMobile()
   const previewCount = isMobile ? 2 : 3
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({})
+  const thread = useMemo(
+    () => visibleMessages(messages, showPendingQuestion),
+    [messages, showPendingQuestion],
+  )
+  const threadKey = thread.map((m) => m.id).join('|')
 
-  if (!messages.length) return null
+  useEffect(() => {
+    setExpandedIds({})
+  }, [threadKey, showAllSources])
+
+  if (!thread.length) return null
+
+  function toggleExpanded(msgId: string) {
+    setExpandedIds((prev) => ({ ...prev, [msgId]: !prev[msgId] }))
+  }
 
   return (
     <div className="chat-thread" aria-label="Conversation">
-      {messages.map((msg, index) => {
+      {thread.map((msg) => {
         if (msg.role === 'user') {
           return (
             <article key={msg.id} className="chat-turn chat-turn-user">
@@ -51,14 +107,12 @@ export function ChatThread({
 
         const sources = msg.sources ?? []
         const mode = msg.meta?.mode
-        const isLastAssistant =
-          index === messages.length - 1 ||
-          !messages.slice(index + 1).some((m) => m.role === 'assistant')
-
-        const visibleSources =
-          isLastAssistant && !showAllSources
-            ? sources.slice(0, previewCount)
-            : sources
+        const expanded = Boolean(expandedIds[msg.id])
+        const visibleSources = expanded
+          ? sources
+          : sources.slice(0, previewCount)
+        const hiddenCount = Math.max(0, sources.length - previewCount)
+        const canToggle = hiddenCount > 0
 
         return (
           <article key={msg.id} className="chat-turn chat-turn-assistant">
@@ -70,38 +124,46 @@ export function ChatThread({
                   : 'Turbo Research · deeper · more accurate · longer'}
               </p>
             ) : null}
-            {msg.content?.trim() ? (
-              <MarkdownAnswer content={msg.content} />
-            ) : (
-              <p className="italic text-[var(--ink-muted)]">No answer was returned.</p>
-            )}
-            {sources.length > 0 ? (
-              <div className={`chat-turn-sources${isMobile ? ' chat-turn-sources-mobile' : ''}`}>
-                <h3 className="chat-turn-sources-title">Sources</h3>
-                <ul className="source-list">
-                  {visibleSources.map((source, i) => (
-                    <SourceItem
-                      key={`${msg.id}-${source.heading}-${source.chunkIndex}-${source.pageNumber}-${i}`}
-                      source={source}
-                      index={i}
-                      compact={isMobile}
-                    />
-                  ))}
-                </ul>
-                {isLastAssistant && sources.length > previewCount ? (
-                  <button
-                    type="button"
-                    className="sources-more"
-                    onClick={onToggleSources}
-                    aria-expanded={showAllSources}
-                  >
-                    {showAllSources
-                      ? 'Show fewer'
-                      : `+${sources.length - previewCount} more`}
-                  </button>
+            <MarkdownAnswer content={msg.content} />
+            <div
+              className={`chat-turn-sources${isMobile ? ' chat-turn-sources-mobile' : ''}`}
+            >
+              <h3 className="chat-turn-sources-title">Sources</h3>
+              <ul className={`source-list${isMobile ? ' source-list-mobile' : ''}`}>
+                {visibleSources.map((source, i) => (
+                  <SourceItem
+                    key={`${msg.id}-${source.heading}-${source.chunkIndex}-${source.pageNumber}-${i}`}
+                    source={source}
+                    index={i}
+                    compact={isMobile}
+                  />
+                ))}
+                {isMobile && canToggle ? (
+                  <li className="source-item source-item-compact source-more-item">
+                    <button
+                      type="button"
+                      className="source-compact-more"
+                      onClick={() => toggleExpanded(msg.id)}
+                      aria-expanded={expanded}
+                    >
+                      {expanded ? 'Show fewer' : 'Show more'}
+                    </button>
+                  </li>
                 ) : null}
-              </div>
-            ) : null}
+              </ul>
+              {!isMobile && canToggle ? (
+                <button
+                  type="button"
+                  className="sources-more"
+                  onClick={() => toggleExpanded(msg.id)}
+                  aria-expanded={expanded}
+                >
+                  {expanded
+                    ? 'Show fewer sources'
+                    : `Show ${hiddenCount} more sources`}
+                </button>
+              ) : null}
+            </div>
           </article>
         )
       })}

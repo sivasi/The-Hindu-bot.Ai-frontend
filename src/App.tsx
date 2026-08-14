@@ -15,7 +15,7 @@ import {
   listChats,
 } from './chats'
 import { ChatSidebar } from './components/ChatSidebar'
-import { ChatThread } from './components/ChatThread'
+import { ChatThread, pruneIncompleteTurns } from './components/ChatThread'
 import { GoogleSignIn } from './components/GoogleSignIn'
 import { JourneyStatus } from './components/JourneyStatus'
 import { StreamingAnswer } from './components/StreamingAnswer'
@@ -140,9 +140,11 @@ export default function App() {
   const [chatsLoading, setChatsLoading] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const answerRef = useRef<HTMLElement>(null)
+  const threadEndRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
   const streamDraftRef = useRef('')
   const tokenFlushRaf = useRef<number | null>(null)
+  const shouldStickToBottom = useRef(true)
 
   const mode = resolveMode(turboOn, turboKind)
   const signedIn = authStatus === 'signed_in'
@@ -246,6 +248,12 @@ export default function App() {
     void refreshChats()
   }, [signedIn])
 
+  function scrollThreadToBottom(behavior: ScrollBehavior = 'smooth') {
+    requestAnimationFrame(() => {
+      threadEndRef.current?.scrollIntoView({ behavior, block: 'end' })
+    })
+  }
+
   useEffect(() => {
     return () => {
       abortRef.current?.abort()
@@ -254,6 +262,20 @@ export default function App() {
       }
     }
   }, [])
+
+  useEffect(() => {
+    if (!signedIn) return
+    if (!messages.length && !isStreamingAnswer && !journeyMessage) return
+    if (!shouldStickToBottom.current) return
+    scrollThreadToBottom('smooth')
+  }, [
+    signedIn,
+    messages,
+    streamDraft,
+    isStreamingAnswer,
+    journeyMessage,
+    status,
+  ])
 
   function resetThreadUi() {
     setQuestion('')
@@ -317,9 +339,11 @@ export default function App() {
     try {
       const { session, messages: loaded } = await getChat(id)
       setActiveSessionId(session.id)
-      setMessages(loaded)
+      setMessages(pruneIncompleteTurns(loaded))
       setSessions((prev) => upsertSession(prev, session))
-      const lastAssistant = [...loaded].reverse().find((m) => m.role === 'assistant')
+      const lastAssistant = [...pruneIncompleteTurns(loaded)]
+        .reverse()
+        .find((m) => m.role === 'assistant')
       if (lastAssistant) {
         setResult({
           answer: lastAssistant.content,
@@ -335,6 +359,11 @@ export default function App() {
         setResult(null)
         setStatus('idle')
       }
+      shouldStickToBottom.current = true
+      requestAnimationFrame(() => {
+        scrollThreadToBottom('auto')
+        requestAnimationFrame(() => scrollThreadToBottom('auto'))
+      })
     } catch (err) {
       if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
         handleSessionExpired(err.message)
@@ -378,6 +407,8 @@ export default function App() {
     setStreamDraft('')
     streamDraftRef.current = ''
     setIsStreamingAnswer(false)
+    shouldStickToBottom.current = true
+    scrollThreadToBottom('smooth')
     setJourneyMessage(
       mode === 'normal'
         ? 'Searching about the content'
@@ -403,16 +434,11 @@ export default function App() {
         },
         onToken: (text) => {
           if (!text) return
-          const wasEmpty = streamDraftRef.current.length === 0
           setJourneyMessage(null)
           setIsStreamingAnswer(true)
           streamDraftRef.current += text
           flushStreamDraft()
-          if (wasEmpty) {
-            requestAnimationFrame(() => {
-              answerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-            })
-          }
+          scrollThreadToBottom('smooth')
         },
         onSession: (event) => {
           const session = {
@@ -439,12 +465,22 @@ export default function App() {
             meta: data.meta,
             createdAt: new Date().toISOString(),
           }
-          setMessages((prev) => [...prev, assistantMessage])
-          setResult(data)
-          setStatus('done')
-          requestAnimationFrame(() => {
-            answerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          })
+          const hasAnswer = Boolean(data.answer?.trim())
+          const hasSources = (data.sources?.length ?? 0) > 0
+          if (hasAnswer && hasSources) {
+            setMessages((prev) => [...prev, assistantMessage])
+            setResult(data)
+            setStatus('done')
+            scrollThreadToBottom('smooth')
+          } else {
+            setMessages((prev) => {
+              const last = prev[prev.length - 1]
+              return last?.role === 'user' ? prev.slice(0, -1) : prev
+            })
+            setResult(null)
+            setError('No answer or sources were returned. Please try again.')
+            setStatus('error')
+          }
         },
         onError: (message) => {
           if (tokenFlushRaf.current != null) {
@@ -455,6 +491,10 @@ export default function App() {
           setIsStreamingAnswer(false)
           setStreamDraft('')
           streamDraftRef.current = ''
+          setMessages((prev) => {
+            const last = prev[prev.length - 1]
+            return last?.role === 'user' ? prev.slice(0, -1) : prev
+          })
           setError(message)
           setStatus('error')
         },
@@ -486,13 +526,23 @@ export default function App() {
           meta: data.meta,
           createdAt: new Date().toISOString(),
         }
-        setMessages((prev) => [...prev, assistantMessage])
-        setResult(data)
-        setStatus('done')
-        void refreshChats()
-        requestAnimationFrame(() => {
-          answerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        })
+        const hasAnswer = Boolean(data.answer?.trim())
+        const hasSources = (data.sources?.length ?? 0) > 0
+        if (hasAnswer && hasSources) {
+          setMessages((prev) => [...prev, assistantMessage])
+          setResult(data)
+          setStatus('done')
+          void refreshChats()
+          scrollThreadToBottom('smooth')
+        } else {
+          setMessages((prev) => {
+            const last = prev[prev.length - 1]
+            return last?.role === 'user' ? prev.slice(0, -1) : prev
+          })
+          setResult(null)
+          setError('No answer or sources were returned. Please try again.')
+          setStatus('error')
+        }
       } catch (fallbackErr) {
         if (
           fallbackErr instanceof ApiError &&
@@ -513,6 +563,10 @@ export default function App() {
         setIsStreamingAnswer(false)
         setStreamDraft('')
         streamDraftRef.current = ''
+        setMessages((prev) => {
+          const last = prev[prev.length - 1]
+          return last?.role === 'user' ? prev.slice(0, -1) : prev
+        })
         setError(message)
         setStatus('error')
       }
@@ -793,6 +847,7 @@ export default function App() {
                   messages={messages}
                   showAllSources={showAllSources}
                   onToggleSources={() => setShowAllSources((v) => !v)}
+                  showPendingQuestion={status === 'loading'}
                 />
               </section>
             )}
@@ -830,6 +885,8 @@ export default function App() {
                 {renderAskForm(true)}
               </div>
             )}
+
+            {signedIn && <div ref={threadEndRef} className="chat-thread-end" aria-hidden />}
 
             {!signedIn && (
               <section className="about-block" aria-labelledby="about-heading">
@@ -893,7 +950,7 @@ export default function App() {
 
         <footer className="site-footer">
           <div className="site-footer-left">
-            <p className="site-footer-brand">The Hindu Bot.AI · 2.0</p>
+            <p className="site-footer-brand">The Hindu Bot.AI</p>
             {signedIn ? (
               <a
                 className="site-footer-pdf"

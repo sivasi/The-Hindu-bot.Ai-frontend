@@ -26,6 +26,9 @@ export function SourceItem({ source, index, compact = false }: SourceItemProps) 
           target="_blank"
           rel="noreferrer noopener"
         >
+          <span className="source-compact-bullet" aria-hidden>
+            •
+          </span>
           <span className="source-compact-heading">{heading}</span>
           <span className="source-compact-page">{pageLabel}</span>
         </a>
