@@ -15,11 +15,22 @@ import {
   listChats,
 } from './chats'
 import { ChatSidebar } from './components/ChatSidebar'
+import type { AppMode } from './components/ChatSidebar'
 import { ChatThread, pruneIncompleteTurns } from './components/ChatThread'
+import { DiscoverFeed } from './components/DiscoverFeed'
 import { GoogleSignIn } from './components/GoogleSignIn'
 import { JourneyStatus } from './components/JourneyStatus'
 import { StreamingAnswer } from './components/StreamingAnswer'
-import type { ChatMessage, ChatSession, QueryMode, QueryResponse } from './types'
+import { fetchDiscoverHome, fetchDiscoverSection } from './discover'
+import type {
+  ChatMessage,
+  ChatSession,
+  DiscoverSectionInfo,
+  ExamArticle,
+  QueryMode,
+  QueryResponse,
+} from './types'
+import { DISCOVER_SECTIONS } from './types'
 
 type TurboKind = 'short' | 'research'
 
@@ -139,6 +150,17 @@ export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [chatsLoading, setChatsLoading] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [appMode, setAppMode] = useState<AppMode>('discover')
+  const [discoverSections, setDiscoverSections] = useState<DiscoverSectionInfo[]>(
+    () => DISCOVER_SECTIONS.map((section) => ({ section, count: 0 })),
+  )
+  const [activeDiscoverSection, setActiveDiscoverSection] =
+    useState('Front Page')
+  const [discoverArticles, setDiscoverArticles] = useState<ExamArticle[]>([])
+  const [frontPageArticles, setFrontPageArticles] = useState<ExamArticle[]>([])
+  const [discoverLoading, setDiscoverLoading] = useState(false)
+  const [discoverError, setDiscoverError] = useState<string | null>(null)
+  const [discoverHomeLoaded, setDiscoverHomeLoaded] = useState(false)
   const answerRef = useRef<HTMLElement>(null)
   const threadEndRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -243,6 +265,14 @@ export default function App() {
       setSessions([])
       setActiveSessionId(null)
       setMessages([])
+      setDiscoverHomeLoaded(false)
+      setDiscoverArticles([])
+      setFrontPageArticles([])
+      setDiscoverError(null)
+      setActiveDiscoverSection('Front Page')
+      setDiscoverSections(
+        DISCOVER_SECTIONS.map((section) => ({ section, count: 0 })),
+      )
       return
     }
     void refreshChats()
@@ -324,6 +354,7 @@ export default function App() {
     setMessages([])
     resetThreadUi()
     setMobileNavOpen(false)
+    setAppMode('chat')
   }
 
   async function handleSelectChat(id: string) {
@@ -336,6 +367,7 @@ export default function App() {
     streamDraftRef.current = ''
     setIsStreamingAnswer(false)
     setQuestion('')
+    setAppMode('chat')
     try {
       const { session, messages: loaded } = await getChat(id)
       setActiveSessionId(session.id)
@@ -573,8 +605,100 @@ export default function App() {
     }
   }
 
+  async function loadDiscoverHome() {
+    setDiscoverLoading(true)
+    setDiscoverError(null)
+    try {
+      const data = await fetchDiscoverHome()
+      const catalog =
+        data.sections.length > 0
+          ? data.sections
+          : DISCOVER_SECTIONS.map((section) => ({ section, count: 0 }))
+      // Keep canonical order; ensure Front Page stays first / present.
+      const byName = new Map(catalog.map((s) => [s.section, s]))
+      const ordered = DISCOVER_SECTIONS.map(
+        (section) => byName.get(section) ?? { section, count: 0 },
+      )
+      setDiscoverSections(ordered)
+      setActiveDiscoverSection('Front Page')
+      setFrontPageArticles(data.frontPage.articles)
+      setDiscoverArticles(data.frontPage.articles)
+      setDiscoverHomeLoaded(true)
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        handleSessionExpired(err.message)
+        return
+      }
+      setDiscoverError(
+        err instanceof ApiError ? err.message : 'Could not load Discover.',
+      )
+      setDiscoverArticles([])
+      setFrontPageArticles([])
+    } finally {
+      setDiscoverLoading(false)
+    }
+  }
+
+  async function handleSelectDiscoverSection(section: string) {
+    setActiveDiscoverSection(section)
+    setAppMode('discover')
+    setDiscoverError(null)
+
+    if (section === 'Front Page') {
+      if (discoverHomeLoaded) {
+        setDiscoverArticles(frontPageArticles)
+        return
+      }
+      await loadDiscoverHome()
+      return
+    }
+
+    setDiscoverLoading(true)
+    try {
+      const data = await fetchDiscoverSection(section)
+      setDiscoverArticles(data.articles)
+      setDiscoverSections((prev) =>
+        prev.map((s) =>
+          s.section === data.section ? { ...s, count: data.count } : s,
+        ),
+      )
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+        handleSessionExpired(err.message)
+        return
+      }
+      setDiscoverError(
+        err instanceof ApiError
+          ? err.message
+          : `Could not load ${section}.`,
+      )
+      setDiscoverArticles([])
+    } finally {
+      setDiscoverLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!signedIn || appMode !== 'discover') return
+    if (discoverHomeLoaded) return
+    void loadDiscoverHome()
+  }, [signedIn, appMode, discoverHomeLoaded])
+
+  function handleModeChange(mode: AppMode) {
+    setAppMode(mode)
+    setMobileNavOpen(false)
+    if (mode === 'discover') {
+      setError(null)
+      setActiveDiscoverSection('Front Page')
+      if (discoverHomeLoaded) {
+        setDiscoverArticles(frontPageArticles)
+      }
+    }
+  }
+
   function applySuggestion(text: string) {
     if (!signedIn || status === 'loading') return
+    setAppMode('chat')
     setQuestion(text)
   }
 
@@ -769,57 +893,53 @@ export default function App() {
           onClick={() => setMobileNavOpen(false)}
         />
 
-        <div className={`page-grid${signedIn ? ' page-grid-chats' : ''}`}>
+        <div className="page-grid page-grid-chats">
           <div className={`sidebar-slot${mobileNavOpen ? ' is-open' : ''}`}>
-            {signedIn ? (
-              <ChatSidebar
-                sessions={sessions}
-                activeId={activeSessionId}
-                loading={chatsLoading}
-                busy={chatBusy}
-                userName={userLabel}
-                userAvatar={userAvatar}
-                suggestions={INSIDE}
-                onNewChat={handleNewChat}
-                onSelect={(id) => void handleSelectChat(id)}
-                onLogout={() => void handleLogout()}
-                onSuggest={applySuggestion}
-                onClose={() => setMobileNavOpen(false)}
-                showClose
-              />
-            ) : (
-              <aside className="inside-col" aria-label="Inside">
-                <div className="chat-sidebar-title-row">
-                  <h2 className="inside-title">Inside</h2>
-                  <button
-                    type="button"
-                    className="mobile-drawer-close"
-                    onClick={() => setMobileNavOpen(false)}
-                    aria-label="Close menu"
-                  >
-                    ✕
-                  </button>
-                </div>
-                {INSIDE.map((item) => (
-                  <button
-                    key={item.head}
-                    type="button"
-                    className="inside-item"
-                    onClick={() => {
-                      applySuggestion(item.q)
-                      setMobileNavOpen(false)
-                    }}
-                    disabled={!signedIn || status === 'loading'}
-                  >
-                    <p className="inside-head">{item.head}</p>
-                    <p className="inside-snip">{item.snip}</p>
-                  </button>
-                ))}
-              </aside>
-            )}
+            <ChatSidebar
+              appMode={appMode}
+              onModeChange={handleModeChange}
+              signedIn={signedIn}
+              sessions={sessions}
+              activeId={activeSessionId}
+              loading={chatsLoading}
+              busy={chatBusy}
+              userName={userLabel}
+              userAvatar={userAvatar}
+              suggestions={INSIDE}
+              discoverSections={discoverSections}
+              activeDiscoverSection={activeDiscoverSection}
+              onSelectDiscoverSection={(section) => {
+                void handleSelectDiscoverSection(section)
+              }}
+              onNewChat={handleNewChat}
+              onSelect={(id) => void handleSelectChat(id)}
+              onLogout={() => void handleLogout()}
+              onSuggest={applySuggestion}
+              onClose={() => setMobileNavOpen(false)}
+              showClose
+            />
           </div>
 
           <main className="lead-col">
+            {appMode === 'discover' ? (
+              authStatus === 'checking' ? (
+                <section className="auth-lead auth-lead-checking">
+                  <p className="auth-eyebrow">Archive edition</p>
+                  <h2 className="auth-headline">Checking your press pass…</h2>
+                  <div className="loading-bar" aria-hidden />
+                </section>
+              ) : !signedIn ? (
+                <GoogleSignIn onSignedIn={handleSignedIn} />
+              ) : (
+                <DiscoverFeed
+                  section={activeDiscoverSection}
+                  articles={discoverArticles}
+                  loading={discoverLoading}
+                  error={discoverError}
+                />
+              )
+            ) : (
+              <>
             {signedIn && !hasThread && (
               <div className="lead-headline-block">
                 <p className="ask-deck">
@@ -944,6 +1064,8 @@ export default function App() {
                   column. Each Ask is saved to the active thread.
                 </p>
               </section>
+            )}
+              </>
             )}
           </main>
         </div>

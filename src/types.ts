@@ -103,3 +103,52 @@ export type StreamEvent =
   | StreamSessionEvent
   | StreamErrorEvent
   | StreamDoneEvent
+
+export const DISCOVER_SECTIONS = [
+  'Front Page',
+  'National',
+  'Regional',
+  'Edit',
+  'Op-Ed',
+  'Business',
+  'Foreign',
+  'Sports',
+  'Science',
+] as const
+
+export type DiscoverSectionName = (typeof DISCOVER_SECTIONS)[number]
+
+export type ExamArticle = {
+  id: string
+  title: string
+  section: string
+  examRelevance?: string
+  summary?: string
+  refinedBody?: string
+  examTags?: string[]
+  pageNumber?: number
+  wordCount?: number
+  source?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export type DiscoverSectionInfo = {
+  section: string
+  count: number
+}
+
+export type DiscoverHomeResponse = {
+  sections: DiscoverSectionInfo[]
+  frontPage: {
+    section: string
+    count: number
+    articles: ExamArticle[]
+  }
+}
+
+export type DiscoverSectionResponse = {
+  section: string
+  count: number
+  articles: ExamArticle[]
+}

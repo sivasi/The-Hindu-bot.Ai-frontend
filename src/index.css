@@ -299,9 +299,147 @@
   gap: 0.5rem;
 }
 
-.chat-sidebar-title-row .inside-title {
-  margin-bottom: 0;
+.sidebar-mode-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sidebar-mode-row-active {
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid var(--rule-light);
+}
+
+.sidebar-mode-label {
+  appearance: none;
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--serif);
+  font-size: 1.35rem;
+  font-weight: 400;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-mode-label:hover {
+  color: var(--hindu-red);
+}
+
+.sidebar-mode-label-active {
+  font-weight: 400;
+  color: var(--hindu-red);
+}
+
+.chat-sidebar-top > .sidebar-mode-row {
+  margin-bottom: 0.55rem;
+}
+
+.chat-sidebar-title-row .sidebar-mode-label {
+  width: auto;
   flex: 1 1 auto;
+  min-width: 0;
+}
+
+.discover-sidebar-blank {
+  min-height: 2rem;
+}
+
+.discover-page {
+  min-height: 18rem;
+}
+
+.discover-section-list {
+  list-style: none;
+  margin: 0 0 1.15rem;
+  padding: 0;
+  max-height: 8.5rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.discover-section-list .discover-section-item {
+  padding: 0.45rem 0;
+}
+
+.discover-section-list .inside-head {
+  font-size: 0.85rem;
+  margin-bottom: 0.15rem;
+}
+
+.discover-section-list .inside-snip {
+  font-size: 0.68rem;
+}
+
+.discover-section-item.discover-section-active .inside-head {
+  color: var(--hindu-red);
+}
+
+.discover-section-item.discover-section-active {
+  background: #fff;
+}
+
+.discover-status {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 0.95rem;
+  font-style: italic;
+  color: var(--ink-muted);
+}
+
+.discover-feed {
+  gap: 1.35rem;
+}
+
+.discover-para {
+  margin: 0;
+}
+
+.discover-para .answer-body {
+  font-family: var(--serif);
+  font-size: 0.95rem;
+  font-weight: 400;
+  line-height: 1.55;
+  color: var(--ink-muted);
+}
+
+.discover-para .answer-body p {
+  margin: 0 0 0.65rem;
+}
+
+.discover-para .answer-body > :last-child {
+  margin-bottom: 0;
+}
+
+.discover-para .answer-body strong {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.discover-article-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.1rem;
+  margin-top: 0.65rem;
+}
+
+.discover-page-num {
+  font-family: var(--sans);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
 }
 
 .mobile-drawer-close {
@@ -329,7 +467,7 @@
   padding-bottom: 0.35rem;
 }
 
-.chat-sidebar .chat-title {
+.chat-sidebar .chat-title:not(.sidebar-mode-label) {
   color: var(--ink);
 }
 
@@ -473,10 +611,6 @@
   position: relative;
 }
 
-.chat-session-item:last-child .chat-session-main.inside-item {
-  border-bottom: none;
-}
-
 .chat-session-main.inside-item,
 .chat-session-main.inside-item:hover,
 .chat-session-main.inside-item:focus,
@@ -530,6 +664,29 @@
 .chat-turn-assistant {
   padding-top: 0.85rem;
   border-top: 1px solid var(--rule-light);
+}
+
+/* Discover: more space between rule and headline (overrides chat-turn padding) */
+.chat-turn-assistant.discover-article {
+  padding-top: 2.25rem;
+}
+
+.chat-turn-assistant.discover-article:first-child {
+  padding-top: 0.5rem;
+  border-top: none;
+}
+
+.discover-article .chat-turn-label {
+  margin: 0 0 0.75rem;
+}
+
+.discover-headline {
+  margin: 0 0 0.55rem;
+  font-family: var(--serif);
+  font-size: clamp(1.15rem, 2.4vw, 1.55rem);
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--ink);
 }
 
 /* Darker rule after an answer so the next question clearly starts a new turn */
