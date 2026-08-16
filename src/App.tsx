@@ -14,6 +14,7 @@ import {
   getChat,
   listChats,
 } from './chats'
+import { BackendDown } from './components/BackendDown'
 import { ChatSidebar } from './components/ChatSidebar'
 import type { AppMode } from './components/ChatSidebar'
 import { ChatThread, pruneIncompleteTurns } from './components/ChatThread'
@@ -138,6 +139,10 @@ export default function App() {
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState<string | null>(null)
   const [healthWarning, setHealthWarning] = useState<string | null>(null)
+  const [backendStatus, setBackendStatus] = useState<
+    'checking' | 'up' | 'down'
+  >('checking')
+  const [backendRetrying, setBackendRetrying] = useState(false)
   const [result, setResult] = useState<QueryResponse | null>(null)
   const [journeyMessage, setJourneyMessage] = useState<string | null>(null)
   const [showAllSources, setShowAllSources] = useState(false)
@@ -185,30 +190,45 @@ export default function App() {
     }
   }, [])
 
+  async function probeBackend() {
+    try {
+      const h = await checkHealth()
+      if (!h.ok) {
+        setBackendStatus('down')
+        setHealthWarning(null)
+        return false
+      }
+      setBackendStatus('up')
+      if (!h.chromaOk || !h.indexReady) {
+        setHealthWarning(
+          'Archive index may be unavailable. Answers could fail until the backend is ready.',
+        )
+      } else {
+        setHealthWarning(null)
+      }
+      return true
+    } catch {
+      setBackendStatus('down')
+      setHealthWarning(null)
+      return false
+    }
+  }
+
   useEffect(() => {
     let cancelled = false
-    checkHealth()
-      .then((h) => {
-        if (cancelled) return
-        if (!h.ok || !h.chromaOk || !h.indexReady) {
-          setHealthWarning(
-            'Archive index may be unavailable. Answers could fail until the backend is ready.',
-          )
-        } else {
-          setHealthWarning(null)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setHealthWarning(
-            'Could not reach the archive API. Check that the backend is running on port 3001.',
-          )
-        }
-      })
+    void probeBackend().then(() => {
+      if (cancelled) return
+    })
     return () => {
       cancelled = true
     }
   }, [])
+
+  async function handleBackendRetry() {
+    setBackendRetrying(true)
+    await probeBackend()
+    setBackendRetrying(false)
+  }
 
   async function refreshChats() {
     setChatsLoading(true)
@@ -867,6 +887,13 @@ export default function App() {
           ))}
         </div>
 
+        {backendStatus === 'down' ? (
+          <BackendDown
+            onRetry={() => void handleBackendRetry()}
+            retrying={backendRetrying}
+          />
+        ) : (
+          <>
         {healthWarning && (
           <div role="status" className="banner-warn">
             {healthWarning}
@@ -1069,6 +1096,8 @@ export default function App() {
             )}
           </main>
         </div>
+          </>
+        )}
 
         <footer className="site-footer">
           <div className="site-footer-left">
