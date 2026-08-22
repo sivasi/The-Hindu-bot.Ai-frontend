@@ -2,9 +2,13 @@
   command = "npm run build"
   publish = "dist"
 
-# Same-origin /api → GKE NodePort (avoids HTTPS→HTTP mixed content)
+# Netlify: proxy API calls so the HTTPS site never talks to plain HTTP (mixed content).
+# Browser calls:  https://the-hindu-bot.netlify.app/api/...
+# Netlify forwards to: http://35.200.239.39:30001/api/...
+
 [[redirects]]
   from = "/api/*"
-  to = "http://34.93.159.106:30001/api/:splat"
+  to = "http://35.200.239.39:30001/api/:splat"
   status = 200
   force = true
+  headers = {X-From = "netlify-proxy"}
