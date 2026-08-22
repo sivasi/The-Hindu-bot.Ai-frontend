@@ -285,14 +285,6 @@ export default function App() {
       setSessions([])
       setActiveSessionId(null)
       setMessages([])
-      setDiscoverHomeLoaded(false)
-      setDiscoverArticles([])
-      setFrontPageArticles([])
-      setDiscoverError(null)
-      setActiveDiscoverSection('Front Page')
-      setDiscoverSections(
-        DISCOVER_SECTIONS.map((section) => ({ section, count: 0 })),
-      )
       return
     }
     void refreshChats()
@@ -645,7 +637,11 @@ export default function App() {
       setDiscoverArticles(data.frontPage.articles)
       setDiscoverHomeLoaded(true)
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      if (
+        signedIn &&
+        err instanceof ApiError &&
+        (err.status === 401 || err.status === 403)
+      ) {
         handleSessionExpired(err.message)
         return
       }
@@ -683,7 +679,11 @@ export default function App() {
         ),
       )
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      if (
+        signedIn &&
+        err instanceof ApiError &&
+        (err.status === 401 || err.status === 403)
+      ) {
         handleSessionExpired(err.message)
         return
       }
@@ -699,10 +699,10 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (!signedIn || appMode !== 'discover') return
+    if (appMode !== 'discover') return
     if (discoverHomeLoaded) return
     void loadDiscoverHome()
-  }, [signedIn, appMode, discoverHomeLoaded])
+  }, [appMode, discoverHomeLoaded])
 
   function handleModeChange(mode: AppMode) {
     setAppMode(mode)
@@ -949,22 +949,12 @@ export default function App() {
 
           <main className="lead-col">
             {appMode === 'discover' ? (
-              authStatus === 'checking' ? (
-                <section className="auth-lead auth-lead-checking">
-                  <p className="auth-eyebrow">Archive edition</p>
-                  <h2 className="auth-headline">Checking your press pass…</h2>
-                  <div className="loading-bar" aria-hidden />
-                </section>
-              ) : !signedIn ? (
-                <GoogleSignIn onSignedIn={handleSignedIn} />
-              ) : (
-                <DiscoverFeed
-                  section={activeDiscoverSection}
-                  articles={discoverArticles}
-                  loading={discoverLoading}
-                  error={discoverError}
-                />
-              )
+              <DiscoverFeed
+                section={activeDiscoverSection}
+                articles={discoverArticles}
+                loading={discoverLoading}
+                error={discoverError}
+              />
             ) : (
               <>
             {signedIn && !hasThread && (

@@ -1,5 +1,5 @@
 import { ApiError, API_URL } from './api'
-import { authHeaders, clearToken } from './token'
+import { authHeaders, getToken } from './token'
 import type {
   DiscoverHomeResponse,
   DiscoverSectionResponse,
@@ -8,8 +8,12 @@ import type {
 
 function throwIfUnauthorized(res: Response): void {
   if (res.status === 401 || res.status === 403) {
-    clearToken()
-    throw new ApiError('Session expired. Please sign in again.', res.status)
+    throw new ApiError(
+      getToken()
+        ? 'Session expired. Please sign in again.'
+        : 'Could not load Discover.',
+      res.status,
+    )
   }
 }
 
