@@ -42,6 +42,7 @@ import {
   isPublisherEmail,
   leaveAdminPath,
 } from './publisher'
+import { applyDocumentSeo } from './seo'
 
 const AdminGate = lazy(() => import('./components/AdminGate'))
 
@@ -790,6 +791,10 @@ export default function App() {
       window.removeEventListener('hashchange', applyAdminLocation)
     }
   }, [authStatus, canPublish, signedIn])
+
+  useEffect(() => {
+    applyDocumentSeo(appMode)
+  }, [appMode])
 
   const bounceFromAdmin = useCallback(() => {
     leaveAdminPath()
