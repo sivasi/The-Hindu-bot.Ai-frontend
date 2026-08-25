@@ -42,7 +42,15 @@ import {
   isPublisherEmail,
   leaveAdminPath,
 } from './publisher'
-import { applyDocumentSeo } from './seo'
+import {
+  applyDocumentSeo,
+  enterArchivePath,
+  enterChatPath,
+  isArchiveLocation,
+  isChatLocation,
+  leaveArchivePath,
+  leaveChatPath,
+} from './seo'
 
 const AdminGate = lazy(() => import('./components/AdminGate'))
 
@@ -168,9 +176,13 @@ export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [chatsLoading, setChatsLoading] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  const [appMode, setAppMode] = useState<AppMode>(
-    DISCOVER_MENU_VISIBLE ? 'discover' : 'welcome',
-  )
+  const [appMode, setAppMode] = useState<AppMode>(() => {
+    if (DISCOVER_MENU_VISIBLE) return 'discover'
+    if (typeof window === 'undefined') return 'welcome'
+    if (isArchiveLocation()) return 'archive'
+    if (isChatLocation()) return 'chat'
+    return 'welcome'
+  })
   const [discoverSections, setDiscoverSections] = useState<DiscoverSectionInfo[]>(
     () => DISCOVER_SECTIONS.map((section) => ({ section, count: 0 })),
   )
@@ -362,7 +374,15 @@ export default function App() {
       setAppMode('admin')
       return
     }
+    if (isArchiveLocation()) {
+      leaveAdminPath()
+      leaveChatPath()
+      setAppMode('archive')
+      return
+    }
     leaveAdminPath()
+    leaveArchivePath()
+    enterChatPath(true)
     setAppMode('chat')
   }
 
@@ -377,9 +397,13 @@ export default function App() {
     resetThreadUi()
     setMobileNavOpen(false)
     leaveAdminPath()
-    setAppMode((mode) =>
-      mode === 'archive' || mode === 'discover' ? mode : 'welcome',
-    )
+    if (isArchiveLocation()) {
+      setAppMode('archive')
+      return
+    }
+    leaveArchivePath()
+    leaveChatPath()
+    setAppMode('welcome')
   }
 
   function handleSessionExpired(message?: string) {
@@ -392,9 +416,13 @@ export default function App() {
     resetThreadUi()
     setError(message || 'Session expired. Please sign in again.')
     leaveAdminPath()
-    setAppMode((mode) =>
-      mode === 'archive' || mode === 'discover' ? mode : 'welcome',
-    )
+    if (isArchiveLocation()) {
+      setAppMode('archive')
+      return
+    }
+    leaveArchivePath()
+    leaveChatPath()
+    setAppMode('welcome')
   }
 
   function handleNewChat() {
@@ -404,6 +432,8 @@ export default function App() {
     resetThreadUi()
     setMobileNavOpen(false)
     leaveAdminPath()
+    leaveArchivePath()
+    enterChatPath()
     setAppMode('chat')
   }
 
@@ -418,6 +448,8 @@ export default function App() {
     setIsStreamingAnswer(false)
     setQuestion('')
     leaveAdminPath()
+    leaveArchivePath()
+    enterChatPath()
     setAppMode('chat')
     try {
       const { session, messages: loaded } = await getChat(id)
@@ -697,6 +729,8 @@ export default function App() {
   async function handleSelectDiscoverSection(section: string) {
     setActiveDiscoverSection(section)
     leaveAdminPath()
+    leaveArchivePath()
+    leaveChatPath()
     setAppMode('discover')
     setDiscoverError(null)
 
@@ -757,38 +791,59 @@ export default function App() {
       setAppMode('admin')
       return
     }
+    if (isArchiveLocation()) {
+      setAppMode('archive')
+      return
+    }
+    if (isChatLocation()) {
+      setAppMode('chat')
+      return
+    }
+    enterChatPath(true)
     setAppMode('chat')
   }, [signedIn, appMode, canPublish])
 
   useEffect(() => {
     if (authStatus === 'checking') return
 
-    function applyAdminLocation() {
-      if (!isAdminLocation()) {
-        setAppMode((mode) =>
-          mode === 'admin' ? (signedIn ? 'chat' : 'welcome') : mode,
-        )
+    function applyPublicLocation() {
+      if (isAdminLocation()) {
+        if (!signedIn) {
+          setAppMode('welcome')
+          return
+        }
+        if (canPublish) {
+          enterAdminPath(true)
+          setAppMode('admin')
+          return
+        }
+        leaveAdminPath()
+        enterChatPath(true)
+        setAppMode('chat')
         return
       }
-      if (!signedIn) {
-        setAppMode('welcome')
+      if (isArchiveLocation()) {
+        setAppMode('archive')
         return
       }
-      if (canPublish) {
-        enterAdminPath(true)
-        setAppMode('admin')
+      if (isChatLocation()) {
+        setAppMode('chat')
         return
       }
-      leaveAdminPath()
-      setAppMode('chat')
+      if (signedIn) {
+        enterChatPath(true)
+        setAppMode('chat')
+        return
+      }
+      setAppMode('welcome')
     }
 
-    applyAdminLocation()
-    window.addEventListener('popstate', applyAdminLocation)
-    window.addEventListener('hashchange', applyAdminLocation)
+    applyPublicLocation()
+    window.addEventListener('popstate', applyPublicLocation)
+    window.addEventListener('hashchange', applyPublicLocation)
     return () => {
-      window.removeEventListener('popstate', applyAdminLocation)
-      window.removeEventListener('hashchange', applyAdminLocation)
+      window.removeEventListener('popstate', applyPublicLocation)
+      window.removeEventListener('hashchange', applyPublicLocation)
     }
   }, [authStatus, canPublish, signedIn])
 
@@ -798,7 +853,13 @@ export default function App() {
 
   const bounceFromAdmin = useCallback(() => {
     leaveAdminPath()
-    setAppMode(signedIn ? 'chat' : 'welcome')
+    if (signedIn) {
+      enterChatPath()
+      setAppMode('chat')
+      return
+    }
+    leaveChatPath()
+    setAppMode('welcome')
   }, [signedIn])
 
   async function loadArchive() {
@@ -821,9 +882,15 @@ export default function App() {
   function handleModeChange(mode: AppMode) {
     if (mode === 'discover' && !DISCOVER_MENU_VISIBLE) return
     if (mode === 'admin' && !canPublish) return
-    const next = mode === 'chat' && !signedIn ? 'welcome' : mode
+    const next = mode
     if (next === 'admin') enterAdminPath()
-    else leaveAdminPath()
+    else if (next === 'archive') enterArchivePath()
+    else if (next === 'chat') enterChatPath()
+    else {
+      leaveAdminPath()
+      leaveArchivePath()
+      leaveChatPath()
+    }
     setAppMode(next)
     setMobileNavOpen(false)
     if (next === 'discover') {
@@ -838,6 +905,8 @@ export default function App() {
   function applySuggestion(text: string) {
     if (!signedIn || status === 'loading') return
     leaveAdminPath()
+    leaveArchivePath()
+    enterChatPath()
     setAppMode('chat')
     setQuestion(text)
   }

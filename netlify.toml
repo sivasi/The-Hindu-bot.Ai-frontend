@@ -25,6 +25,26 @@
   to = "/index.html"
   status = 200
 
+[[redirects]]
+  from = "/archive"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/archive/"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/chat"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/chat/"
+  to = "/index.html"
+  status = 200
+
 [[headers]]
   for = "/admin"
   [headers.values]
