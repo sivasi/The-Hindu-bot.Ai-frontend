@@ -65,7 +65,7 @@ export function ArchiveFeed({
 
   if (loading) {
     return (
-      <section className="discover-page" aria-label="Archive">
+      <section className="discover-page archive-page" aria-label="Archive">
         <p className="discover-status">Loading archive…</p>
         <div className="loading-bar" aria-hidden />
       </section>
@@ -74,7 +74,7 @@ export function ArchiveFeed({
 
   if (error) {
     return (
-      <section className="discover-page" aria-label="Archive">
+      <section className="discover-page archive-page" aria-label="Archive">
         <div role="alert" className="banner-warn animate-fade-up">
           {error}
         </div>
@@ -84,7 +84,7 @@ export function ArchiveFeed({
 
   if (!issues.length) {
     return (
-      <section className="discover-page" aria-label="Archive">
+      <section className="discover-page archive-page" aria-label="Archive">
         <p className="discover-status">No newspaper issues are available yet.</p>
       </section>
     )

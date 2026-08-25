@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { ApiError, checkHealth, queryArchive, queryArchiveStream } from './api'
 import { fetchArchive } from './archive'
@@ -24,6 +24,7 @@ import { DiscoverFeed } from './components/DiscoverFeed'
 import { GoogleSignIn } from './components/GoogleSignIn'
 import { JourneyStatus } from './components/JourneyStatus'
 import { StreamingAnswer } from './components/StreamingAnswer'
+import { WelcomePage } from './components/WelcomePage'
 import { fetchDiscoverHome, fetchDiscoverSection } from './discover'
 import type {
   ArchiveIssue,
@@ -35,6 +36,14 @@ import type {
   QueryResponse,
 } from './types'
 import { DISCOVER_SECTIONS } from './types'
+import {
+  enterAdminPath,
+  isAdminLocation,
+  isPublisherEmail,
+  leaveAdminPath,
+} from './publisher'
+
+const AdminGate = lazy(() => import('./components/AdminGate'))
 
 type TurboKind = 'short' | 'research'
 
@@ -78,34 +87,34 @@ const CITIES = [
 
 const FEATURES = [
   {
-    kicker: 'Archive desk',
+    kicker: 'Catch up',
     tone: 'offwhite',
-    title: 'Ask the paper, not the web',
-    blurb: 'Questions are answered only from indexed Hindu archive chunks.',
+    title: 'What did the paper say?',
+    blurb: 'Ask about a story, scheme, or verdict instead of scrolling the PDF.',
   },
   {
-    kicker: 'Grounded',
+    kicker: 'Exams',
     tone: 'red',
-    title: 'Every reply cites sources',
-    blurb: 'Retrieved article excerpts appear under the answer for verification.',
+    title: 'Revise current affairs',
+    blurb: 'Get short, sourced notes from the printed edition for UPSC and other tests.',
   },
   {
-    kicker: 'Retrieval',
+    kicker: 'Policy',
     tone: 'offwhite',
-    title: 'Semantic search over pages',
-    blurb: 'The desk pulls the closest passages before drafting a reply.',
+    title: 'Follow a bill or budget',
+    blurb: 'See how The Hindu covered a law, scheme, or court ruling in plain language.',
   },
   {
-    kicker: 'History',
+    kicker: 'Verify',
     tone: 'red',
-    title: 'Chats stay in the Inside column',
-    blurb: 'Each thread is a session — open, rename, or start a new lead.',
+    title: 'Check a claim',
+    blurb: 'Every reply cites the article excerpt so you can open the original page.',
   },
   {
-    kicker: 'How to use',
+    kicker: 'Briefing',
     tone: 'offwhite',
-    title: 'Type like a headline',
-    blurb: 'Use the lead box as your question. Press Ask to print the answer.',
+    title: 'Summarise a beat',
+    blurb: 'Ask for a recap of coverage you missed — inflation, jobs, or a running story.',
   },
 ] as const
 
@@ -159,7 +168,7 @@ export default function App() {
   const [chatsLoading, setChatsLoading] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [appMode, setAppMode] = useState<AppMode>(
-    DISCOVER_MENU_VISIBLE ? 'discover' : 'chat',
+    DISCOVER_MENU_VISIBLE ? 'discover' : 'welcome',
   )
   const [discoverSections, setDiscoverSections] = useState<DiscoverSectionInfo[]>(
     () => DISCOVER_SECTIONS.map((section) => ({ section, count: 0 })),
@@ -185,6 +194,7 @@ export default function App() {
 
   const mode = resolveMode(turboOn, turboKind)
   const signedIn = authStatus === 'signed_in'
+  const canPublish = signedIn && isPublisherEmail(user?.email)
 
   const editionParts = useMemo(() => {
     const now = new Date()
@@ -345,6 +355,14 @@ export default function App() {
     setUser(nextUser)
     setAuthStatus('signed_in')
     setError(null)
+    const publisher = isPublisherEmail(nextUser.email)
+    if (isAdminLocation() && publisher) {
+      enterAdminPath(true)
+      setAppMode('admin')
+      return
+    }
+    leaveAdminPath()
+    setAppMode('chat')
   }
 
   async function handleLogout() {
@@ -357,6 +375,10 @@ export default function App() {
     setMessages([])
     resetThreadUi()
     setMobileNavOpen(false)
+    leaveAdminPath()
+    setAppMode((mode) =>
+      mode === 'archive' || mode === 'discover' ? mode : 'welcome',
+    )
   }
 
   function handleSessionExpired(message?: string) {
@@ -368,6 +390,10 @@ export default function App() {
     setMessages([])
     resetThreadUi()
     setError(message || 'Session expired. Please sign in again.')
+    leaveAdminPath()
+    setAppMode((mode) =>
+      mode === 'archive' || mode === 'discover' ? mode : 'welcome',
+    )
   }
 
   function handleNewChat() {
@@ -376,6 +402,7 @@ export default function App() {
     setMessages([])
     resetThreadUi()
     setMobileNavOpen(false)
+    leaveAdminPath()
     setAppMode('chat')
   }
 
@@ -389,6 +416,7 @@ export default function App() {
     streamDraftRef.current = ''
     setIsStreamingAnswer(false)
     setQuestion('')
+    leaveAdminPath()
     setAppMode('chat')
     try {
       const { session, messages: loaded } = await getChat(id)
@@ -667,6 +695,7 @@ export default function App() {
 
   async function handleSelectDiscoverSection(section: string) {
     setActiveDiscoverSection(section)
+    leaveAdminPath()
     setAppMode('discover')
     setDiscoverError(null)
 
@@ -720,6 +749,53 @@ export default function App() {
     void loadArchive()
   }, [appMode, archiveLoaded])
 
+  useEffect(() => {
+    if (!signedIn || appMode !== 'welcome') return
+    if (isAdminLocation() && canPublish) {
+      enterAdminPath(true)
+      setAppMode('admin')
+      return
+    }
+    setAppMode('chat')
+  }, [signedIn, appMode, canPublish])
+
+  useEffect(() => {
+    if (authStatus === 'checking') return
+
+    function applyAdminLocation() {
+      if (!isAdminLocation()) {
+        setAppMode((mode) =>
+          mode === 'admin' ? (signedIn ? 'chat' : 'welcome') : mode,
+        )
+        return
+      }
+      if (!signedIn) {
+        setAppMode('welcome')
+        return
+      }
+      if (canPublish) {
+        enterAdminPath(true)
+        setAppMode('admin')
+        return
+      }
+      leaveAdminPath()
+      setAppMode('chat')
+    }
+
+    applyAdminLocation()
+    window.addEventListener('popstate', applyAdminLocation)
+    window.addEventListener('hashchange', applyAdminLocation)
+    return () => {
+      window.removeEventListener('popstate', applyAdminLocation)
+      window.removeEventListener('hashchange', applyAdminLocation)
+    }
+  }, [authStatus, canPublish, signedIn])
+
+  const bounceFromAdmin = useCallback(() => {
+    leaveAdminPath()
+    setAppMode(signedIn ? 'chat' : 'welcome')
+  }, [signedIn])
+
   async function loadArchive() {
     setArchiveLoading(true)
     setArchiveError(null)
@@ -739,9 +815,13 @@ export default function App() {
 
   function handleModeChange(mode: AppMode) {
     if (mode === 'discover' && !DISCOVER_MENU_VISIBLE) return
-    setAppMode(mode)
+    if (mode === 'admin' && !canPublish) return
+    const next = mode === 'chat' && !signedIn ? 'welcome' : mode
+    if (next === 'admin') enterAdminPath()
+    else leaveAdminPath()
+    setAppMode(next)
     setMobileNavOpen(false)
-    if (mode === 'discover') {
+    if (next === 'discover') {
       setError(null)
       setActiveDiscoverSection('Front Page')
       if (discoverHomeLoaded) {
@@ -752,6 +832,7 @@ export default function App() {
 
   function applySuggestion(text: string) {
     if (!signedIn || status === 'loading') return
+    leaveAdminPath()
     setAppMode('chat')
     setQuestion(text)
   }
@@ -842,6 +923,9 @@ export default function App() {
             <span className="ask-toolbar-hint">{modeHint(mode)}</span>
           )}
         </div>
+        <p className="ask-corpus-note">
+          Chat context: 1 January – 23 August 2026
+        </p>
       </form>
     )
   }
@@ -978,6 +1062,7 @@ export default function App() {
               onSuggest={applySuggestion}
               onClose={() => setMobileNavOpen(false)}
               showClose
+              canPublish={canPublish}
             />
           </div>
 
@@ -997,6 +1082,41 @@ export default function App() {
                 activeDate={activeArchiveDate}
                 onOpenIssue={(date) => setActiveArchiveDate(date)}
               />
+            ) : appMode === 'admin' && canPublish ? (
+              <Suspense
+                fallback={
+                  <section className="discover-page admin-page" aria-label="Admin">
+                    <p className="discover-status">Loading admin…</p>
+                    <div className="loading-bar" aria-hidden />
+                  </section>
+                }
+              >
+                <AdminGate
+                  onDenied={bounceFromAdmin}
+                  onUploaded={(issue) => {
+                    setArchiveIssues((current) => {
+                      const without = current.filter((row) => row.date !== issue.date)
+                      return [issue, ...without].sort((a, b) =>
+                        a.date < b.date ? 1 : a.date > b.date ? -1 : 0,
+                      )
+                    })
+                    setArchiveLoaded(true)
+                    setActiveArchiveDate(issue.date)
+                  }}
+                />
+              </Suspense>
+            ) : !signedIn ? (
+              authStatus === 'checking' ? (
+                <section className="auth-lead auth-lead-checking">
+                  <p className="auth-eyebrow">Archive edition</p>
+                  <h2 className="auth-headline">Checking your press pass…</h2>
+                  <div className="loading-bar" aria-hidden />
+                </section>
+              ) : (
+                <WelcomePage>
+                  <GoogleSignIn embed onSignedIn={handleSignedIn} />
+                </WelcomePage>
+              )
             ) : (
               <>
             {signedIn && !hasThread && (
@@ -1008,15 +1128,7 @@ export default function App() {
               </div>
             )}
 
-            {authStatus === 'checking' ? (
-              <section className="auth-lead auth-lead-checking">
-                <p className="auth-eyebrow">Archive edition</p>
-                <h2 className="auth-headline">Checking your press pass…</h2>
-                <div className="loading-bar" aria-hidden />
-              </section>
-            ) : !signedIn ? (
-              <GoogleSignIn onSignedIn={handleSignedIn} />
-            ) : !hasThread ? (
+            {!hasThread ? (
               renderAskForm(false)
             ) : null}
 
@@ -1067,60 +1179,12 @@ export default function App() {
 
             {signedIn && <div ref={threadEndRef} className="chat-thread-end" aria-hidden />}
 
-            {!signedIn && (
-              <section className="about-block" aria-labelledby="about-heading">
-                <h2 id="about-heading" className="sr-only">
-                  About this website
-                </h2>
-                <p className="about-lead">
-                  This website turns The Hindu archive into an interactive edition.
-                  Instead of scrolling for a story, you ask the paper — and it
-                  answers with citations from indexed article chunks.
-                </p>
-
-                <div className="about-how">
-                  <h3 className="about-subhead">How the desk works</h3>
-                  <ol className="about-steps">
-                    <li>
-                      <span className="about-step-num">1</span>
-                      <div>
-                        <p className="about-step-title">Sign in</p>
-                        <p className="about-step-body">
-                          Open the edition with Google. Your chats appear in the
-                          Inside column.
-                        </p>
-                      </div>
-                    </li>
-                    <li>
-                      <span className="about-step-num">2</span>
-                      <div>
-                        <p className="about-step-title">Ask the lead</p>
-                        <p className="about-step-body">
-                          Put your question in the headline slot. Start a new chat
-                          anytime from the sidebar.
-                        </p>
-                      </div>
-                    </li>
-                    <li>
-                      <span className="about-step-num">3</span>
-                      <div>
-                        <p className="about-step-title">Read with citations</p>
-                        <p className="about-step-body">
-                          Follow the journey line, then the answer and sources —
-                          jump to the PDF page when you need the full clip.
-                        </p>
-                      </div>
-                    </li>
-                  </ol>
-                </div>
-              </section>
-            )}
-
             {signedIn && status === 'idle' && !hasThread && !result && (
               <section className="about-block">
                 <p className="about-lead">
                   Start a new lead above, or open a previous chat from the Inside
-                  column. Each Ask is saved to the active thread.
+                  column. Answers cover 1 January through 23 August 2026 for now;
+                  later updates will include today and the past three years.
                 </p>
               </section>
             )}
@@ -1134,6 +1198,7 @@ export default function App() {
         <footer className="site-footer">
           <div className="site-footer-left">
             <p className="site-footer-brand">The Hindu Bot.AI</p>
+            <p className="site-footer-note">More updates are coming</p>
           </div>
           <p className="site-footer-credit">
             Made with{' '}

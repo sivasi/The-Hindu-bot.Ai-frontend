@@ -69,9 +69,10 @@ function loadGisScript(): Promise<void> {
 type GoogleSignInProps = {
   onSignedIn: (user: AuthUser) => void
   onError?: (message: string) => void
+  embed?: boolean
 }
 
-export function GoogleSignIn({ onSignedIn, onError }: GoogleSignInProps) {
+export function GoogleSignIn({ onSignedIn, onError, embed = false }: GoogleSignInProps) {
   const buttonRef = useRef<HTMLDivElement>(null)
   const [ready, setReady] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -164,14 +165,8 @@ export function GoogleSignIn({ onSignedIn, onError }: GoogleSignInProps) {
     }
   }, [])
 
-  return (
-    <section className="auth-lead animate-fade-up" aria-busy={busy || !ready}>
-      <p className="auth-eyebrow">Archive edition</p>
-      <h2 className="auth-headline">Sign in to ask the paper</h2>
-      <p className="auth-deck">
-        Open the desk with Google — then type your question where the lead headline sits.
-      </p>
-
+  const button = (
+    <>
       <div className={`auth-signin-wrap${!ready || busy ? ' auth-signin-wrap-busy' : ''}`}>
         <span className="auth-signin-btn" aria-hidden>
           {busy ? 'Signing in…' : ready ? 'Sign in with Google' : 'Loading…'}
@@ -184,6 +179,25 @@ export function GoogleSignIn({ onSignedIn, onError }: GoogleSignInProps) {
           {localError}
         </p>
       ) : null}
+    </>
+  )
+
+  if (embed) {
+    return (
+      <div className="welcome-signin" aria-busy={busy || !ready}>
+        {button}
+      </div>
+    )
+  }
+
+  return (
+    <section className="auth-lead animate-fade-up" aria-busy={busy || !ready}>
+      <p className="auth-eyebrow">Archive edition</p>
+      <h2 className="auth-headline">Sign in to ask the paper</h2>
+      <p className="auth-deck">
+        Open the desk with Google — then type your question where the lead headline sits.
+      </p>
+      {button}
     </section>
   )
 }

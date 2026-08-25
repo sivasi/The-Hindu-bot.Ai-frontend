@@ -13,3 +13,14 @@
   status = 200
   force = true
   headers = {X-From = "netlify-proxy"}
+
+# SPA path for the publisher desk (hash #/admin also works).
+[[redirects]]
+  from = "/admin"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin/"
+  to = "/index.html"
+  status = 200

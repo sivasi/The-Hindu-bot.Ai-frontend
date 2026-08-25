@@ -1,7 +1,7 @@
 import { relativeTime } from '../chats'
 import type { ChatSession, DiscoverSectionInfo } from '../types'
 
-export type AppMode = 'discover' | 'chat' | 'archive'
+export type AppMode = 'welcome' | 'discover' | 'chat' | 'archive' | 'admin'
 
 /** Flip to true when Discover is ready to ship again. Logic stays wired. */
 export const DISCOVER_MENU_VISIBLE = false
@@ -38,6 +38,7 @@ type ChatSidebarProps = {
   onSuggest: (question: string) => void
   onClose?: () => void
   showClose?: boolean
+  canPublish?: boolean
 }
 
 export function ChatSidebar({
@@ -60,6 +61,7 @@ export function ChatSidebar({
   onSuggest,
   onClose,
   showClose,
+  canPublish,
 }: ChatSidebarProps) {
   const showInside = !loading && sessions.length === 0
   const showNewChat = signedIn && sessions.length > 0
@@ -76,6 +78,11 @@ export function ChatSidebar({
 
   function goArchive() {
     onModeChange('archive')
+    onClose?.()
+  }
+
+  function goAdmin() {
+    onModeChange('admin')
     onClose?.()
   }
 
@@ -180,7 +187,7 @@ export function ChatSidebar({
           ) : null}
         </div>
 
-        {appMode === 'discover' || appMode === 'archive' ? null : loading && signedIn ? (
+        {appMode === 'discover' || appMode === 'archive' || appMode === 'admin' ? null : loading && signedIn ? (
           <p className="chat-sidebar-empty">Loading sessions…</p>
         ) : showInside || !signedIn ? (
           <div className="chat-inside-list">
@@ -238,6 +245,20 @@ export function ChatSidebar({
             Archive
           </button>
         </div>
+        {canPublish ? (
+          <div
+            className={`sidebar-mode-row sidebar-mode-row-admin${appMode === 'admin' ? ' sidebar-mode-row-active' : ''}`}
+          >
+            <button
+              type="button"
+              className={`sidebar-mode-label${appMode === 'admin' ? ' sidebar-mode-label-active' : ''}`}
+              aria-current={appMode === 'admin' ? 'page' : undefined}
+              onClick={goAdmin}
+            >
+              Admin
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {signedIn ? (
