@@ -8,10 +8,30 @@ type SourceItemProps = {
   compact?: boolean
 }
 
+function sourceDate(source: Source): string | null {
+  const raw = source.date || source.metadata?.date
+  const iso = String(raw || '').trim()
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : null
+}
+
+function formatIssueDate(iso: string): string {
+  const [year, month, day] = iso.split('-').map(Number)
+  const dt = new Date(Date.UTC(year, month - 1, day))
+  return dt.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  })
+}
+
 export function SourceItem({ source, index, compact = false }: SourceItemProps) {
   const [open, setOpen] = useState(false)
-  const pageLabel = `p.${source.pageNumber}`
-  const pdfUrl = getManualPdfUrl(source.pageNumber)
+  const date = sourceDate(source)
+  const pageLabel = date
+    ? `${formatIssueDate(date)} · p.${source.pageNumber}`
+    : `p.${source.pageNumber}`
+  const pdfUrl = getManualPdfUrl(source.pageNumber, date)
   const heading = source.heading || 'Untitled article'
 
   if (compact) {
@@ -37,9 +57,13 @@ export function SourceItem({ source, index, compact = false }: SourceItemProps) 
   }
 
   const chunkLabel = `Chunk ${source.chunkIndex}/${source.chunkTotal}`
-  const fullPageLabel = source.section
-    ? `Page ${source.pageNumber} · ${source.section}`
-    : `Page ${source.pageNumber}`
+  const fullPageLabel = [
+    date ? formatIssueDate(date) : null,
+    `Page ${source.pageNumber}`,
+    source.section || null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   return (
     <li
@@ -62,7 +86,8 @@ export function SourceItem({ source, index, compact = false }: SourceItemProps) 
         rel="noreferrer noopener"
         onClick={(e) => e.stopPropagation()}
       >
-        Open page {source.pageNumber} in paper »
+        Open {date ? `${formatIssueDate(date)} · ` : ''}page {source.pageNumber} in
+        paper »
       </a>
       {open && (
         <div className="source-full animate-fade-up">

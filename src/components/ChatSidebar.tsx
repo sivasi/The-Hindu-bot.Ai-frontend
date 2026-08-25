@@ -1,7 +1,10 @@
 import { relativeTime } from '../chats'
 import type { ChatSession, DiscoverSectionInfo } from '../types'
 
-export type AppMode = 'discover' | 'chat'
+export type AppMode = 'discover' | 'chat' | 'archive'
+
+/** Flip to true when Discover is ready to ship again. Logic stays wired. */
+export const DISCOVER_MENU_VISIBLE = false
 
 export type InsideSuggestion = {
   head: string
@@ -71,6 +74,11 @@ export function ChatSidebar({
     onModeChange('chat')
   }
 
+  function goArchive() {
+    onModeChange('archive')
+    onClose?.()
+  }
+
   function selectSession(id: string) {
     onModeChange('chat')
     onSelect(id)
@@ -97,46 +105,51 @@ export function ChatSidebar({
   return (
     <aside className="inside-col chat-sidebar" aria-label="Edition navigation">
       <div className="chat-sidebar-top">
-        <div
-          className={`sidebar-mode-row${appMode === 'discover' ? ' sidebar-mode-row-active' : ''}`}
-        >
-          <button
-            type="button"
-            className={`sidebar-mode-label${appMode === 'discover' ? ' sidebar-mode-label-active' : ''}`}
-            aria-current={appMode === 'discover' ? 'page' : undefined}
-            onClick={goDiscover}
-          >
-            Discover
-          </button>
-        </div>
+        {DISCOVER_MENU_VISIBLE ? (
+          <>
+            <div
+              className={`sidebar-mode-row${appMode === 'discover' ? ' sidebar-mode-row-active' : ''}`}
+            >
+              <button
+                type="button"
+                className={`sidebar-mode-label${appMode === 'discover' ? ' sidebar-mode-label-active' : ''}`}
+                aria-current={appMode === 'discover' ? 'page' : undefined}
+                onClick={goDiscover}
+              >
+                Discover
+              </button>
+            </div>
 
-        {appMode === 'discover' ? (
-          <ul className="discover-section-list" aria-label="Discover sections">
-            {discoverSections.map((item) => {
-              const active = item.section === activeDiscoverSection
-              return (
-                <li key={item.section}>
-                  <button
-                    type="button"
-                    className={`inside-item discover-section-item${active ? ' discover-section-active' : ''}`}
-                    onClick={() => selectDiscoverSection(item.section)}
-                    aria-current={active ? 'true' : undefined}
-                  >
-                    <p className="inside-head">{item.section}</p>
-                    <p className="inside-snip">
-                      {item.count} {item.count === 1 ? 'article' : 'articles'}
-                    </p>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
+            {appMode === 'discover' ? (
+              <ul className="discover-section-list" aria-label="Discover sections">
+                {discoverSections.map((item) => {
+                  const active = item.section === activeDiscoverSection
+                  return (
+                    <li key={item.section}>
+                      <button
+                        type="button"
+                        className={`inside-item discover-section-item${active ? ' discover-section-active' : ''}`}
+                        onClick={() => selectDiscoverSection(item.section)}
+                        aria-current={active ? 'true' : undefined}
+                      >
+                        <p className="inside-head">{item.section}</p>
+                        <p className="inside-snip">
+                          {item.count} {item.count === 1 ? 'article' : 'articles'}
+                        </p>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : null}
+          </>
         ) : null}
 
         <div className="chat-sidebar-head">
           <div
             className={`chat-sidebar-title-row${appMode === 'chat' ? ' sidebar-mode-row-active' : ''}`}
-          >            <button
+          >
+            <button
               type="button"
               className={`sidebar-mode-label${appMode === 'chat' ? ' sidebar-mode-label-active' : ''}`}
               aria-current={appMode === 'chat' ? 'page' : undefined}
@@ -167,7 +180,7 @@ export function ChatSidebar({
           ) : null}
         </div>
 
-        {appMode === 'discover' ? null : loading && signedIn ? (
+        {appMode === 'discover' || appMode === 'archive' ? null : loading && signedIn ? (
           <p className="chat-sidebar-empty">Loading sessions…</p>
         ) : showInside || !signedIn ? (
           <div className="chat-inside-list">
@@ -212,6 +225,19 @@ export function ChatSidebar({
             })}
           </ul>
         )}
+
+        <div
+          className={`sidebar-mode-row sidebar-mode-row-archive${appMode === 'archive' ? ' sidebar-mode-row-active' : ''}`}
+        >
+          <button
+            type="button"
+            className={`sidebar-mode-label${appMode === 'archive' ? ' sidebar-mode-label-active' : ''}`}
+            aria-current={appMode === 'archive' ? 'page' : undefined}
+            onClick={goArchive}
+          >
+            Archive
+          </button>
+        </div>
       </div>
 
       {signedIn ? (

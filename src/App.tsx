@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { ApiError, checkHealth, getManualPdfUrl, queryArchive, queryArchiveStream } from './api'
+import { ApiError, checkHealth, queryArchive, queryArchiveStream } from './api'
+import { fetchArchive } from './archive'
 import {
   avatarUrl,
   clearToken,
@@ -14,8 +15,9 @@ import {
   getChat,
   listChats,
 } from './chats'
+import { ArchiveFeed } from './components/ArchiveFeed'
 import { BackendDown } from './components/BackendDown'
-import { ChatSidebar } from './components/ChatSidebar'
+import { ChatSidebar, DISCOVER_MENU_VISIBLE } from './components/ChatSidebar'
 import type { AppMode } from './components/ChatSidebar'
 import { ChatThread, pruneIncompleteTurns } from './components/ChatThread'
 import { DiscoverFeed } from './components/DiscoverFeed'
@@ -24,6 +26,7 @@ import { JourneyStatus } from './components/JourneyStatus'
 import { StreamingAnswer } from './components/StreamingAnswer'
 import { fetchDiscoverHome, fetchDiscoverSection } from './discover'
 import type {
+  ArchiveIssue,
   ChatMessage,
   ChatSession,
   DiscoverSectionInfo,
@@ -155,7 +158,9 @@ export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [chatsLoading, setChatsLoading] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  const [appMode, setAppMode] = useState<AppMode>('discover')
+  const [appMode, setAppMode] = useState<AppMode>(
+    DISCOVER_MENU_VISIBLE ? 'discover' : 'chat',
+  )
   const [discoverSections, setDiscoverSections] = useState<DiscoverSectionInfo[]>(
     () => DISCOVER_SECTIONS.map((section) => ({ section, count: 0 })),
   )
@@ -166,6 +171,11 @@ export default function App() {
   const [discoverLoading, setDiscoverLoading] = useState(false)
   const [discoverError, setDiscoverError] = useState<string | null>(null)
   const [discoverHomeLoaded, setDiscoverHomeLoaded] = useState(false)
+  const [archiveIssues, setArchiveIssues] = useState<ArchiveIssue[]>([])
+  const [archiveLoading, setArchiveLoading] = useState(false)
+  const [archiveError, setArchiveError] = useState<string | null>(null)
+  const [archiveLoaded, setArchiveLoaded] = useState(false)
+  const [activeArchiveDate, setActiveArchiveDate] = useState<string | null>(null)
   const answerRef = useRef<HTMLElement>(null)
   const threadEndRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -704,7 +714,31 @@ export default function App() {
     void loadDiscoverHome()
   }, [appMode, discoverHomeLoaded])
 
+  useEffect(() => {
+    if (appMode !== 'archive') return
+    if (archiveLoaded) return
+    void loadArchive()
+  }, [appMode, archiveLoaded])
+
+  async function loadArchive() {
+    setArchiveLoading(true)
+    setArchiveError(null)
+    try {
+      const data = await fetchArchive()
+      setArchiveIssues(data.issues)
+      setArchiveLoaded(true)
+    } catch (err) {
+      setArchiveError(
+        err instanceof ApiError ? err.message : 'Could not load archive.',
+      )
+      setArchiveIssues([])
+    } finally {
+      setArchiveLoading(false)
+    }
+  }
+
   function handleModeChange(mode: AppMode) {
+    if (mode === 'discover' && !DISCOVER_MENU_VISIBLE) return
     setAppMode(mode)
     setMobileNavOpen(false)
     if (mode === 'discover') {
@@ -955,6 +989,14 @@ export default function App() {
                 loading={discoverLoading}
                 error={discoverError}
               />
+            ) : appMode === 'archive' ? (
+              <ArchiveFeed
+                issues={archiveIssues}
+                loading={archiveLoading}
+                error={archiveError}
+                activeDate={activeArchiveDate}
+                onOpenIssue={(date) => setActiveArchiveDate(date)}
+              />
             ) : (
               <>
             {signedIn && !hasThread && (
@@ -1092,20 +1134,6 @@ export default function App() {
         <footer className="site-footer">
           <div className="site-footer-left">
             <p className="site-footer-brand">The Hindu Bot.AI</p>
-            {signedIn ? (
-              <a
-                className="site-footer-pdf"
-                href={getManualPdfUrl()}
-                target="_blank"
-                rel="noreferrer noopener"
-              >
-                View newspaper PDF »
-              </a>
-            ) : (
-              <span className="site-footer-pdf site-footer-pdf-muted">
-                Sign in to view newspaper PDF »
-              </span>
-            )}
           </div>
           <p className="site-footer-credit">
             Made with{' '}

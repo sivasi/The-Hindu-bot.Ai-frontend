@@ -11,10 +11,12 @@ import { authHeaders, clearToken, getToken } from './token'
 /** Same-origin `/api/...` — Netlify proxies to GKE; Vite proxies locally. */
 export const API_URL = ''
 
-export function getManualPdfUrl(pageNumber?: number): string {
+export function getManualPdfUrl(pageNumber?: number, date?: string | null): string {
   const token = getToken()
   const params = new URLSearchParams()
   if (token) params.set('token', token)
+  const iso = String(date || '').trim()
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) params.set('date', iso)
   const qs = params.toString()
   const base = `${API_URL}/api/manual${qs ? `?${qs}` : ''}`
   if (typeof pageNumber === 'number' && pageNumber > 0) {

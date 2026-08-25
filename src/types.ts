@@ -11,6 +11,7 @@ export type Source = {
   chunkIndex: number
   chunkTotal: number
   pageNumber: number
+  date?: string | null
   section?: string
   excerpt: string
   pageContent: string
@@ -151,4 +152,18 @@ export type DiscoverSectionResponse = {
   section: string
   count: number
   articles: ExamArticle[]
+}
+
+export type ArchiveIssue = {
+  date: string
+  filename: string
+  totalPages: number | null
+  url: string
+}
+
+export type ArchiveResponse = {
+  calendarStart: string | null
+  calendarEnd: string | null
+  count: number
+  issues: ArchiveIssue[]
 }
